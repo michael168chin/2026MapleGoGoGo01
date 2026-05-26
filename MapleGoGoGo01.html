@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v2.3
+     版本：v2.5
      日期：2026-05-27
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -21,7 +21,7 @@
   --maple-green:#27ae60;--maple-blue:#2980b9;--maple-purple:#8e44ad;
   --ui-bg:rgba(10,20,40,0.92);--ui-border:#f1c40f;
 }
-body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans TC',sans-serif;overflow:hidden;}
+body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;width:100vw;font-family:'Noto Sans TC',sans-serif;overflow:hidden;}
 
 /* ========= TITLE ========= */
 #game-title{
@@ -46,22 +46,17 @@ body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;ju
 #reset-btn:hover{background:rgba(192,57,43,0.55);transform:rotate(-180deg);}
 
 /* ========= CANVAS WRAP ========= */
-#game-wrap{position:relative;width:min(900px,100vw);margin:0 auto;}
+#game-wrap{position:relative;width:100%;margin:0 auto;}
 canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
   box-shadow:0 0 40px rgba(192,57,43,0.4);cursor:crosshair;
   width:100%;height:auto;touch-action:none;}
-@media (max-width:900px){
-  #game-title{font-size:1.1rem;letter-spacing:1px;}
-  #hud{font-size:.75rem;padding:5px 10px;gap:6px;}
-  .hud-val{font-size:.88rem;}
-  #power-bar-bg{width:72px;}
-  #ammo-bar{max-width:110px;}
-}
-@media (min-width:768px) and (max-width:1024px){
-  /* iPad: fill full viewport width */
-  #game-wrap{width:100vw;max-width:100vw;}
-  body{padding:0;}
-}
+#game-title{font-size:clamp(.85rem,1.8vw,1.5rem);letter-spacing:clamp(1px,0.3vw,3px);}
+#hud{font-size:clamp(.65rem,1.2vw,.9rem);padding:clamp(4px,0.8vw,8px) clamp(8px,1.5vw,16px);gap:clamp(4px,0.8vw,10px);}
+.hud-val{font-size:clamp(.8rem,1.4vw,1.1rem);}
+#power-bar-bg{width:clamp(60px,10vw,120px);}
+#ammo-bar{max-width:clamp(80px,15vw,160px);}
+#gear-btn{width:clamp(24px,3vw,36px);height:clamp(24px,3vw,36px);}
+#reset-btn{width:clamp(24px,3vw,34px);height:clamp(24px,3vw,34px);font-size:clamp(.9rem,1.5vw,1.3rem);}
 
 /* ========= HUD ========= */
 #hud{display:flex;justify-content:space-between;align-items:center;
@@ -186,14 +181,14 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 
 <div id="game-title">
   <span id="title-text">A321 前進楓之國</span>
-  <button id="reset-btn" onclick="openResetConfirm()" title="重置遊戲">↺</button>
-  <svg id="gear-btn" viewBox="0 0 24 24" onclick="openSettings()" title="設定">
-    <path fill="#f1c40f" d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.34.07-.69.07-1.08s-.03-.74-.07-1.08l2.32-1.81c.21-.16.27-.45.14-.69l-2.2-3.81c-.13-.24-.42-.32-.66-.24l-2.73 1.1c-.57-.44-1.17-.81-1.85-1.08L14 2.42c-.04-.26-.27-.42-.54-.42h-2.92c-.27 0-.5.16-.54.42l-.41 2.97c-.68.27-1.28.64-1.85 1.08L5 5.37c-.24-.08-.53 0-.66.24L2.14 9.42c-.13.24-.07.53.14.69l2.32 1.81C4.56 12.26 4.5 12.63 4.5 13s.06.74.1 1.08L2.28 15.89c-.21.16-.27.45-.14.69l2.2 3.81c.13.24.42.32.66.24l2.73-1.1c.57.44 1.17.81 1.85 1.08l.41 2.97c.04.26.27.42.54.42h2.92c.27 0 .5-.16.54-.42l.41-2.97c.68-.27 1.28-.64 1.85-1.08l2.73 1.1c.24.08.53 0 .66-.24l2.2-3.81c.13-.24.07-.53-.14-.69l-2.32-1.81z"/>
-  </svg>
 </div>
 
 <div id="game-wrap">
   <canvas id="gameCanvas" width="900" height="500"></canvas>
+  <button id="reset-btn" onclick="openResetConfirm()" title="重新開始">重新開始</button>
+  <svg id="gear-btn" viewBox="0 0 24 24" onclick="openSettings()" title="設定">
+    <path fill="#f1c40f" d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.34.07-.69.07-1.08s-.03-.74-.07-1.08l2.32-1.81c.21-.16.27-.45.14-.69l-2.2-3.81c-.13-.24-.42-.32-.66-.24l-2.73 1.1c-.57-.44-1.17-.81-1.85-1.08L14 2.42c-.04-.26-.27-.42-.54-.42h-2.92c-.27 0-.5.16-.54.42l-.41 2.97c-.68.27-1.28.64-1.85 1.08L5 5.37c-.24-.08-.53 0-.66.24L2.14 9.42c-.13.24-.07.53.14.69l2.32 1.81C4.56 12.26 4.5 12.63 4.5 13s.06.74.1 1.08L2.28 15.89c-.21.16-.27.45-.14.69l2.2 3.81c.13.24.42.32.66.24l2.73-1.1c.57.44 1.17.81 1.85 1.08l.41 2.97c.04.26.27.42.54.42h2.92c.27 0 .5-.16.54-.42l.41-2.97c.68-.27 1.28-.64 1.85-1.08l2.73 1.1c.24.08.53 0 .66-.24l2.2-3.81c.13-.24.07-.53-.14-.69l-2.32-1.81z"/>
+  </svg>
   <div id="hud">
     <div class="hud-item">
       <span class="hud-label">玩家</span>
@@ -281,8 +276,8 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div class="setting-row">
       <label>目標移動速度</label>
-      <input type="range" id="set-speed" min="0.2" max="4.0" step="0.1" value="1.5" oninput="document.getElementById('set-speed-val').textContent=parseFloat(this.value).toFixed(1)">
-      <span class="setting-val" id="set-speed-val">1.5</span>
+      <input type="range" id="set-speed" min="0.2" max="4.0" step="0.1" value="2.5" oninput="document.getElementById('set-speed-val').textContent=parseFloat(this.value).toFixed(1)">
+      <span class="setting-val" id="set-speed-val">2.5</span>
     </div>
     <div class="setting-row">
       <label>砲彈數量</label>
@@ -316,7 +311,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 // ===================== CONFIG =====================
 const cfg = {
   title: 'A321 前進楓之國',
-  speedMult: 1.5,
+  speedMult: 2.5,
   ammoPerRound: 10,
   totalRounds: 3,
 };
@@ -562,6 +557,8 @@ async function confirmChar() {
 
 // ===================== SETTINGS =====================
 function openSettings() {
+  const pwd = prompt('請輸入設定密碼：');
+  if (pwd !== 'A321A321') { if(pwd!==null) alert('密碼錯誤！'); return; }
   document.getElementById('set-title').value = cfg.title;
   document.getElementById('set-speed').value = cfg.speedMult;
   document.getElementById('set-speed-val').textContent = cfg.speedMult.toFixed(1);
@@ -587,7 +584,26 @@ function applySettings() {
 // ===================== GAME =====================
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
+// Dynamic resolution: fill available width keeping 9:5 aspect ratio
+function resizeCanvas() {
+  const wrap = document.getElementById('game-wrap');
+  const availW = wrap.clientWidth;
+  const availH = window.innerHeight;
+  // title+hud take ~80px total, leave room
+  const maxH = availH - 90;
+  let cw = availW;
+  let ch = Math.round(cw * 500 / 900);
+  if (ch > maxH) { ch = maxH; cw = Math.round(ch * 900 / 500); }
+  canvas.width = cw;
+  canvas.height = ch;
+  // Reposition cannon and group
+  cannonBase.x = Math.round(cw * 0.08);
+  cannonBase.y = Math.round(ch - ch * 0.16);
+}
+// Use logical constants that scale with canvas size
+let W = 900, H = 500;
+Object.defineProperty(window, 'W', { get: () => canvas.width });
+Object.defineProperty(window, 'H', { get: () => canvas.height });
 
 let score = 0, round = 1, ammoLeft = cfg.ammoPerRound;
 let gameOver = false, charging = false, chargeStart = 0;
@@ -595,7 +611,7 @@ let power = 0.5, angle = -Math.PI/4;
 let projectile = null, trail = [];
 let particles = [];
 
-const cannonBase = { x: 72, y: H - 72 };
+let cannonBase = { x: 72, y: 428 }; // updated by resizeCanvas()
 
 // Target specs
 const TARGET_SPECS = [
@@ -605,7 +621,16 @@ const TARGET_SPECS = [
   { pts:200, count:24, r:10 },
 ];
 
-const GROUP_CX = Math.round(900*0.82), GROUP_CY = H - 105, GROUP_R = 110;
+// TARGET ZONE = right 30% rectangle (70%~100% x, 57%~100% y)
+function getZoneLeft()   { return canvas.width  * 0.705; }
+function getZoneRight()  { return canvas.width  * 0.995; }
+function getZoneTop()    { return canvas.height * 0.58; }
+function getZoneBottom() { return canvas.height * 0.98; }
+function getZoneW()      { return getZoneRight() - getZoneLeft(); }
+function getZoneH()      { return getZoneBottom() - getZoneTop(); }
+// Keep these for hit collision centre reference
+function getGroupCX()    { return (getZoneLeft()+getZoneRight())/2; }
+function getGroupCY()    { return (getZoneTop()+getZoneBottom())/2; }
 let targets = [];
 
 // ---- Maple leaf particles (Canada atmosphere) ----
@@ -614,8 +639,8 @@ function initLeaves() {
   leaves = [];
   for(let i=0;i<18;i++) {
     leaves.push({
-      x: Math.random()*W,
-      y: Math.random()*H,
+      x: Math.random()*canvas.width,
+      y: Math.random()*canvas.height,
       vx: -0.3-Math.random()*0.4,
       vy: 0.3+Math.random()*0.4,
       rot: Math.random()*Math.PI*2,
@@ -638,12 +663,15 @@ function initTargets() {
   let id=0;
   for(const spec of TARGET_SPECS) {
     for(let i=0;i<spec.count;i++) {
-      const a=Math.random()*Math.PI*2, r=Math.random()*(GROUP_R-spec.r-4);
+      // Place randomly within rectangular zone (local offsets from zone centre)
+      const hw=getZoneW()/2-spec.r-4, hh=getZoneH()/2-spec.r-4;
+      const a=0, r=0; // unused but kept for structure
       const spd = cfg.speedMult;
       targets.push({
         id:id++, pts:spec.pts, r:spec.r,
         charIdx: Math.floor(Math.random()*CHAR_DEFS.length),
-        ox:r*Math.cos(a), oy:r*Math.sin(a),
+        ox:(Math.random()-0.5)*getZoneW()*0.85,
+        oy:(Math.random()-0.5)*getZoneH()*0.85,
         vx:(Math.random()-0.5)*spd,
         vy:(Math.random()-0.5)*spd*0.7,
         hit:false, hitAnim:0,
@@ -682,7 +710,7 @@ function updateAngle(mx,my) {
 }
 canvas.addEventListener('mousemove',e=>{
   if(hitPopupPending)return;
-  const r=canvas.getBoundingClientRect(),sc=W/r.width;
+  const r=canvas.getBoundingClientRect(),sc=canvas.width/r.width;
   updateAngle((e.clientX-r.left)*sc,(e.clientY-r.top)*sc);
 });
 canvas.addEventListener('mousedown',e=>{
@@ -732,92 +760,136 @@ function spawnHit(x,y,color){
 
 // ---- Background: Canadian landscape ----
 function drawBackground(){
+  const cw=canvas.width, ch=canvas.height;
   // Sky
-  const sky=ctx.createLinearGradient(0,0,0,H*0.60);
+  const sky=ctx.createLinearGradient(0,0,0,ch*0.60);
   sky.addColorStop(0,'#1a4fa0'); sky.addColorStop(0.6,'#5b9bd5'); sky.addColorStop(1,'#b0d4f1');
-  ctx.fillStyle=sky; ctx.fillRect(0,0,W,H*0.60);
+  ctx.fillStyle=sky; ctx.fillRect(0,0,cw,ch);
 
   // Sun
   ctx.save();
   ctx.fillStyle='rgba(255,230,100,0.22)';
-  ctx.beginPath();ctx.arc(820,60,55,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(cw*0.88,ch*0.10,ch*0.12,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='rgba(255,230,100,0.55)';
-  ctx.beginPath();ctx.arc(820,60,34,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(cw*0.88,ch*0.10,ch*0.075,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='#FFF2A0';
-  ctx.beginPath();ctx.arc(820,60,22,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(cw*0.88,ch*0.10,ch*0.046,0,Math.PI*2);ctx.fill();
   ctx.restore();
 
-  // Distant rockies (blue grey)
-  const mtnColors=['#9bb0c8','#7d9ab0','#6a8498'];
-  [[0,0.28,0.9],[40,0.32,0.85],[0,0.35,0.78]].forEach(([offset,peak,dark],mi)=>{
-    ctx.fillStyle=mtnColors[mi];
-    ctx.beginPath();ctx.moveTo(0,H*dark);
-    const pts=[0,90,170,250,340,430,520,610,700,800,900];
-    pts.forEach((x,i)=>{const y=H*(dark-(dark-peak)*Math.abs(Math.sin((x+offset+i*40)*0.012)));ctx.lineTo(x,y);});
-    ctx.lineTo(W,H*dark);ctx.closePath();ctx.fill();
-    // Snow cap
-    ctx.fillStyle='rgba(255,255,255,0.55)';
-    ctx.beginPath();ctx.moveTo(0,H*(dark-0.06));
-    pts.forEach((x,i)=>{const y=H*(dark-(dark-peak)*Math.abs(Math.sin((x+offset+i*40)*0.012)));if(y<H*(dark-0.04))ctx.lineTo(x,y);});
-    ctx.closePath();ctx.fill();
+  // ---- MOUNTAINS: varied sizes, 3 layers ----
+  // Each layer: array of [peakX_frac, peakH_frac, baseY_frac]
+  const mtnLayers = [
+    // Back layer - tallest, blue-grey
+    { color:'#8da4be', snowAlpha:0.5, peaks:[
+      {cx:0.08, py:0.10}, {cx:0.22, py:0.04}, {cx:0.38, py:0.13},
+      {cx:0.52, py:0.06}, {cx:0.65, py:0.15}, {cx:0.78, py:0.08},
+      {cx:0.92, py:0.12}
+    ], baseY:0.88, halfW:0.10 },
+    // Mid layer
+    { color:'#7d9ab0', snowAlpha:0.45, peaks:[
+      {cx:0.05, py:0.18}, {cx:0.16, py:0.12}, {cx:0.30, py:0.20},
+      {cx:0.45, py:0.14}, {cx:0.58, py:0.22}, {cx:0.72, py:0.16},
+      {cx:0.85, py:0.19}, {cx:0.97, py:0.13}
+    ], baseY:0.92, halfW:0.08 },
+    // Front layer - shortest, darker
+    { color:'#6a8498', snowAlpha:0.38, peaks:[
+      {cx:0.12, py:0.24}, {cx:0.26, py:0.30}, {cx:0.40, py:0.26},
+      {cx:0.55, py:0.32}, {cx:0.68, py:0.27}, {cx:0.82, py:0.29},
+      {cx:0.95, py:0.25}
+    ], baseY:0.95, halfW:0.07 },
+  ];
+
+  mtnLayers.forEach(layer=>{
+    // Fill polygon connecting all peaks
+    ctx.fillStyle=layer.color;
+    ctx.beginPath();
+    ctx.moveTo(0, ch*layer.baseY);
+    layer.peaks.forEach(p=>{
+      const bx=p.cx*cw, by=p.py*ch;
+      const hw=layer.halfW*cw;
+      ctx.lineTo(Math.max(0,bx-hw), ch*layer.baseY);
+      ctx.lineTo(bx, by);
+      ctx.lineTo(Math.min(cw,bx+hw), ch*layer.baseY);
+    });
+    ctx.lineTo(cw,ch*layer.baseY);ctx.closePath();ctx.fill();
+    // Snow caps
+    ctx.save();ctx.globalAlpha=layer.snowAlpha;ctx.fillStyle='#fff';
+    layer.peaks.forEach(p=>{
+      const bx=p.cx*cw, by=p.py*ch;
+      const hw=layer.halfW*cw*0.35;
+      const snowBase=by+ch*0.045;
+      ctx.beginPath();ctx.moveTo(bx-hw,snowBase);ctx.lineTo(bx,by);ctx.lineTo(bx+hw,snowBase);ctx.closePath();ctx.fill();
+    });
+    ctx.restore();
   });
 
   // Clouds
   clouds.forEach(c=>drawCloud(c.x,c.y,c.s));
 
-  // Pine forest silhouette (left bank, 0~20%)
-  ctx.fillStyle='#1a5c2a';
-  for(let x=0;x<W*0.20;x+=22){
-    const h=35+Math.sin(x*0.07)*10+(x%3)*5;
-    ctx.beginPath();ctx.moveTo(x,H*0.60);ctx.lineTo(x+11,H*0.60-h);ctx.lineTo(x+22,H*0.60);ctx.closePath();ctx.fill();
-  }
-  // Pine forest silhouette (right bank, 70%~100%)
-  ctx.fillStyle='#1a5c2a';
-  for(let x=W*0.70;x<W;x+=22){
-    const h=30+Math.cos(x*0.09)*8+(x%3)*4;
-    ctx.beginPath();ctx.moveTo(x,H*0.57);ctx.lineTo(x+11,H*0.57-h);ctx.lineTo(x+22,H*0.57);ctx.closePath();ctx.fill();
-  }
-  ctx.fillStyle='#145220';
-  for(let x=0;x<W*0.20;x+=18){
-    const h=20+Math.sin(x*0.11)*6;
-    ctx.beginPath();ctx.moveTo(x,H*0.60);ctx.lineTo(x+9,H*0.60-h);ctx.lineTo(x+18,H*0.60);ctx.closePath();ctx.fill();
-  }
-  for(let x=W*0.70;x<W;x+=18){
-    const h=18+Math.cos(x*0.13)*5;
-    ctx.beginPath();ctx.moveTo(x,H*0.57);ctx.lineTo(x+9,H*0.57-h);ctx.lineTo(x+18,H*0.57);ctx.closePath();ctx.fill();
-  }
-
-  // Ground (left - player side, 20%)
-  const gL=ctx.createLinearGradient(0,H*0.60,0,H);
+  // ---- GROUND AREAS ----
+  // Left ground (0~20%)
+  const gL=ctx.createLinearGradient(0,ch*0.60,0,ch);
   gL.addColorStop(0,'#3a6b2a');gL.addColorStop(0.12,'#2d5220');gL.addColorStop(0.3,'#4a3010');gL.addColorStop(1,'#2a1a08');
-  ctx.fillStyle=gL;ctx.fillRect(0,H*0.60,W*0.20,H);
+  ctx.fillStyle=gL;ctx.fillRect(0,ch*0.60,cw*0.20,ch);
 
-  // River (wide: 20%~70% = 50% of screen)
-  const riverL=W*0.20, riverR=W*0.70, riverW=riverR-riverL;
+  // River (20%~70%)
+  const riverL=cw*0.20, riverR=cw*0.70, riverW=riverR-riverL;
   const rv=ctx.createLinearGradient(riverL,0,riverR,0);
   rv.addColorStop(0,'#1a4a8a');rv.addColorStop(0.3,'#1a6db5');rv.addColorStop(0.5,'#2980b9');rv.addColorStop(0.7,'#1a6db5');rv.addColorStop(1,'#1a4a8a');
-  ctx.fillStyle=rv;ctx.fillRect(riverL,H*0.58,riverW,H);
-  // River shimmer lines
-  ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1.2;
-  for(let y=H*0.61;y<H;y+=16){
+  ctx.fillStyle=rv;ctx.fillRect(riverL,ch*0.58,riverW,ch);
+  ctx.strokeStyle='rgba(255,255,255,0.14)';ctx.lineWidth=1.2;
+  for(let y=ch*0.61;y<ch;y+=16){
     ctx.beginPath();ctx.moveTo(riverL,y);
     for(let x=riverL;x<=riverR;x+=10){ctx.lineTo(x,y+Math.sin((x+y)*0.18)*2.5);}
     ctx.stroke();
   }
-  // River highlight (centre glint)
-  ctx.save();ctx.globalAlpha=0.12;
-  ctx.fillStyle='#fff';ctx.fillRect(W*0.42,H*0.58,W*0.06,H);
-  ctx.restore();
+  ctx.save();ctx.globalAlpha=0.10;ctx.fillStyle='#fff';
+  ctx.fillRect(cw*0.42,ch*0.58,cw*0.06,ch);ctx.restore();
 
-  // Ground (right - enemy side, 30%)
-  const gR=ctx.createLinearGradient(0,H*0.57,0,H);
+  // Right ground (70%~100%)
+  const gR=ctx.createLinearGradient(0,ch*0.57,0,ch);
   gR.addColorStop(0,'#3a6b2a');gR.addColorStop(0.12,'#2d5220');gR.addColorStop(0.3,'#4a3010');gR.addColorStop(1,'#2a1a08');
-  ctx.fillStyle=gR;ctx.fillRect(W*0.70,H*0.57,W*0.30,H);
+  ctx.fillStyle=gR;ctx.fillRect(cw*0.70,ch*0.57,cw*0.30,ch);
 
   // Grass top edges
   ctx.fillStyle='#3a8c40';
-  ctx.fillRect(0,H*0.60,W*0.20,10);
-  ctx.fillRect(W*0.70,H*0.57,W*0.30,10);
+  ctx.fillRect(0,ch*0.60,cw*0.20,8);
+  ctx.fillRect(cw*0.70,ch*0.57,cw*0.30,8);
+
+  // ---- TREES: continuous row across FULL width at horizon ----
+  // Draw from x=0 to x=cw, 2 layers (dark back, lighter front)
+  // Trees in river zone float above water slightly (treeline in sky)
+  const treeBaseY = ch*0.60; // unified horizon line
+  const treeBaseYR = ch*0.58; // river bank trees slightly higher
+
+  // Back tree layer (darker, taller) — full width
+  ctx.fillStyle='#0d3d18';
+  for(let x=0;x<=cw;x+=20){
+    const inRiver=(x>cw*0.18 && x<cw*0.72);
+    const base = inRiver ? treeBaseYR - ch*0.01 : treeBaseY;
+    const h=(28+Math.sin(x*0.09+1)*10+(x%5)*3) * (inRiver?0.75:1);
+    const hw=10;
+    ctx.beginPath();ctx.moveTo(x,base);ctx.lineTo(x+hw,base-h);ctx.lineTo(x+hw*2,base);ctx.closePath();ctx.fill();
+  }
+  // Front tree layer (mid green) — full width
+  ctx.fillStyle='#1a5c2a';
+  for(let x=0;x<=cw;x+=17){
+    const inRiver=(x>cw*0.20 && x<cw*0.70);
+    const base = inRiver ? treeBaseYR : treeBaseY;
+    const h=(22+Math.cos(x*0.11)*8+(x%4)*4) * (inRiver?0.65:1);
+    const hw=8;
+    ctx.beginPath();ctx.moveTo(x,base);ctx.lineTo(x+hw,base-h);ctx.lineTo(x+hw*2,base);ctx.closePath();ctx.fill();
+  }
+  // Foreground shrubs (lightest green, short) — left and right only (not on water)
+  ctx.fillStyle='#2ecc71';
+  for(let x=0;x<cw*0.20;x+=13){
+    const h=12+Math.sin(x*0.15)*4;
+    ctx.beginPath();ctx.arc(x+6,treeBaseY,h*0.7,Math.PI,0);ctx.fill();
+  }
+  for(let x=cw*0.70;x<cw;x+=13){
+    const h=12+Math.cos(x*0.17)*4;
+    ctx.beginPath();ctx.arc(x+6,ch*0.57,h*0.7,Math.PI,0);ctx.fill();
+  }
 
   // Maple leaves falling
   leaves.forEach(lf=>drawLeaf(lf));
@@ -894,9 +966,12 @@ function updateTargets(dt){
   targets.forEach(t=>{
     if(t.hit){t.hitAnim+=dt*3;return;}
     t.ox+=t.vx;t.oy+=t.vy;
-    const dist=Math.sqrt(t.ox*t.ox+t.oy*t.oy);
-    const maxR=GROUP_R-t.r;
-    if(dist>maxR){const nx=t.ox/dist,ny=t.oy/dist;t.vx-=nx*0.5;t.vy-=ny*0.3;}
+    // Rectangular boundary bounce
+    const hw=getZoneW()/2-t.r, hh=getZoneH()/2-t.r;
+    if(t.ox>hw){t.ox=hw;t.vx*=-0.7;}
+    if(t.ox<-hw){t.ox=-hw;t.vx*=-0.7;}
+    if(t.oy>hh){t.oy=hh;t.vy*=-0.7;}
+    if(t.oy<-hh){t.oy=-hh;t.vy*=-0.7;}
     t.vx+=(Math.random()-0.5)*spd*0.06;
     t.vy+=(Math.random()-0.5)*spd*0.05;
     const maxV=spd*1.2;
@@ -914,17 +989,17 @@ function updateTargets(dt){
 function tierColor(pts){ return pts===800?'#e74c3c':pts===500?'#e67e22':pts===300?'#27ae60':'#2980b9'; }
 
 function drawTargets(){
-  // Aura behind group
-  ctx.save();ctx.globalAlpha=0.10;
+  // Zone boundary subtle highlight
+  ctx.save();ctx.globalAlpha=0.06;
   ctx.fillStyle='#e74c3c';
-  ctx.beginPath();ctx.arc(GROUP_CX,GROUP_CY,GROUP_R+18,0,Math.PI*2);ctx.fill();
+  ctx.fillRect(getZoneLeft(),getZoneTop(),getZoneW(),getZoneH());
   ctx.restore();
 
   // Draw by pts ascending so high-value on top
   const sorted=[...targets].sort((a,b)=>a.pts-b.pts);
   sorted.forEach(t=>{
     if(t.hit&&t.hitAnim>1)return;
-    const tx=GROUP_CX+t.ox, ty=GROUP_CY+t.oy;
+    const tx=getGroupCX()+t.ox, ty=getGroupCY()+t.oy;
     const def=CHAR_DEFS[t.charIdx];
     ctx.save();
     if(t.hit){ctx.globalAlpha=1-t.hitAnim;ctx.translate(tx,ty);ctx.scale(1+t.hitAnim,1+t.hitAnim);ctx.translate(-tx,-ty);}
@@ -953,7 +1028,7 @@ function updateProjectile(dt){
   projectile.y+=projectile.vy;
   for(const t of targets){
     if(t.hit)continue;
-    const tx=GROUP_CX+t.ox,ty=GROUP_CY+t.oy;
+    const tx=getGroupCX()+t.ox,ty=getGroupCY()+t.oy;
     const dx=projectile.x-tx,dy=projectile.y-ty;
     if(Math.sqrt(dx*dx+dy*dy)<t.r+projectile.r){
       t.hit=true;
@@ -966,7 +1041,7 @@ function updateProjectile(dt){
       return;
     }
   }
-  if(projectile.x>W+20||projectile.x<-20||projectile.y>H+20){
+  if(projectile.x>canvas.width+20||projectile.x<-20||projectile.y>canvas.height+20){
     projectile=null;trail=[];
     checkRoundEnd();
   }
@@ -995,7 +1070,7 @@ function drawAimLine(){
   let vx=Math.cos(angle)*spd,vy=Math.sin(angle)*spd;
   ctx.save();ctx.setLineDash([4,9]);ctx.strokeStyle='rgba(255,220,80,0.38)';ctx.lineWidth=1.5;
   ctx.beginPath();ctx.moveTo(ax,ay);
-  for(let i=0;i<35;i++){vy+=9.8*0.05;ax+=vx;ay+=vy;if(ax>W||ay>H)break;ctx.lineTo(ax,ay);}
+  for(let i=0;i<35;i++){vy+=9.8*0.05;ax+=vx;ay+=vy;if(ax>canvas.width||ay>canvas.height)break;ctx.lineTo(ax,ay);}
   ctx.stroke();ctx.restore();
 }
 
@@ -1092,7 +1167,7 @@ function doReset(){
 function addScorePopup(x,y,pts,color){
   const wrap=document.getElementById('game-wrap');
   const rect=canvas.getBoundingClientRect();const wrapRect=wrap.getBoundingClientRect();
-  const sc=rect.width/W;
+  const sc=rect.width/canvas.width;
   const el=document.createElement('div');el.className='score-popup';
   el.style.left=((x*sc)+(rect.left-wrapRect.left)-16)+'px';
   el.style.top=((y*sc)+(rect.top-wrapRect.top)-16)+'px';
@@ -1105,14 +1180,14 @@ function addScorePopup(x,y,pts,color){
 let lastTime=0;
 function gameLoop(ts){
   const dt=Math.min((ts-lastTime)/1000,0.05);lastTime=ts;
-  ctx.clearRect(0,0,W,H);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
   // Cloud drift
-  clouds.forEach(c=>{c.x+=0.12*c.s;if(c.x>W+90)c.x=-90;});
+  clouds.forEach(c=>{c.x+=0.12*c.s;if(c.x>canvas.width+90)c.x=-90;});
   // Leaf update
   leaves.forEach(lf=>{
     lf.x+=lf.vx;lf.y+=lf.vy;lf.rot+=lf.rotV;
-    if(lf.y>H+20){lf.y=-20;lf.x=Math.random()*W;}
-    if(lf.x<-20){lf.x=W+20;}
+    if(lf.y>canvas.height+20){lf.y=-20;lf.x=Math.random()*canvas.width;}
+    if(lf.x<-20){lf.x=canvas.width+20;}
   });
   drawBackground();
   drawAimLine();
@@ -1131,6 +1206,11 @@ function gameLoop(ts){
 }
 
 // ---- Init ----
+resizeCanvas();
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  initLeaves(); // re-scatter leaves for new size
+});
 buildCharSelect();
 initTargets();
 initLeaves();
