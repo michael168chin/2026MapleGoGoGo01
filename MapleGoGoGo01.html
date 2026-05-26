@@ -1,8 +1,15 @@
+<!-- ============================================================
+     A312 前進加拿大 搶佔楓之谷
+     版本：v2.0
+     日期：2026-05-27
+     說明：楓之谷風格砲擊遊戲，加拿大風景背景
+           含角色選擇、齒輪設定、擊中彈窗（需確認關閉）
+============================================================ -->
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>A312 前進加拿大 搶佔楓之谷</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
@@ -28,9 +35,22 @@ body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;ju
 #gear-btn:hover{transform:rotate(60deg);}
 
 /* ========= CANVAS WRAP ========= */
-#game-wrap{position:relative;width:900px;max-width:100vw;}
+#game-wrap{position:relative;width:min(900px,100vw);margin:0 auto;}
 canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
-  box-shadow:0 0 40px rgba(192,57,43,0.4);cursor:crosshair;width:900px;max-width:100vw;}
+  box-shadow:0 0 40px rgba(192,57,43,0.4);cursor:crosshair;
+  width:100%;height:auto;touch-action:none;}
+@media (max-width:900px){
+  #game-title{font-size:1.1rem;letter-spacing:1px;}
+  #hud{font-size:.75rem;padding:5px 10px;gap:6px;}
+  .hud-val{font-size:.88rem;}
+  #power-bar-bg{width:72px;}
+  #ammo-bar{max-width:110px;}
+}
+@media (min-width:768px) and (max-width:1024px){
+  /* iPad: fill full viewport width */
+  #game-wrap{width:100vw;max-width:100vw;}
+  body{padding:0;}
+}
 
 /* ========= HUD ========= */
 #hud{display:flex;justify-content:space-between;align-items:center;
@@ -103,30 +123,37 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 .setting-val{color:var(--maple-yellow);font-weight:700;font-size:.85rem;min-width:38px;text-align:right;}
 
 /* ========= HIT POPUP ========= */
-#hit-popup{
-  position:absolute;z-index:50;display:none;
-  background:rgba(10,20,40,0.97);border:3px solid var(--maple-yellow);
-  border-radius:14px;padding:14px 20px 12px;
-  box-shadow:0 0 30px rgba(255,215,0,0.5);
-  animation:popIn .3s ease-out;
-  pointer-events:auto;
-  min-width:170px;
+#hit-popup-backdrop{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.55);z-index:200;display:none;
+  align-items:center;justify-content:center;
 }
-@keyframes popIn{from{transform:scale(0.5);opacity:0;}to{transform:scale(1);opacity:1;}}
-#hit-popup .hit-inner{display:flex;align-items:center;gap:14px;margin-bottom:10px;}
-#hit-popup .hit-score{font-size:1.8rem;font-weight:900;color:var(--maple-yellow);
-  text-shadow:0 0 12px #e67e22;}
-#hit-popup .hit-label{font-size:.78rem;color:#aaa;}
-#hit-popup .hit-pts-label{font-size:.75rem;color:#f1c40f;}
+#hit-popup-backdrop.active{display:flex;}
+#hit-popup{
+  background:linear-gradient(160deg,#0d1f3c,#1a0808);
+  border:3px solid var(--maple-yellow);
+  border-radius:16px;padding:20px 28px 16px;
+  box-shadow:0 0 40px rgba(255,215,0,0.55);
+  animation:popIn .3s cubic-bezier(.17,.67,.35,1.3);
+  pointer-events:auto;
+  width:300px;max-width:90vw;
+  text-align:center;
+}
+@keyframes popIn{from{transform:scale(0.4);opacity:0;}to{transform:scale(1);opacity:1;}}
+#hit-popup .hit-inner{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:14px;}
+#hit-popup .hit-score{font-size:2.2rem;font-weight:900;color:var(--maple-yellow);
+  text-shadow:0 0 14px #e67e22;}
+#hit-popup .hit-label{font-size:.82rem;color:#aaa;}
+#hit-popup .hit-pts-label{font-size:.8rem;color:#f1c40f;margin-bottom:2px;}
 #hit-popup-ok{
-  display:block;width:100%;padding:7px 0;
+  display:inline-block;padding:9px 36px;
   background:linear-gradient(135deg,var(--maple-orange),var(--maple-red));
   color:#fff;border:none;border-radius:8px;
-  font-size:.9rem;font-weight:700;font-family:inherit;
-  cursor:pointer;letter-spacing:1px;
-  box-shadow:0 3px 10px rgba(192,57,43,0.4);transition:transform .1s;
+  font-size:1rem;font-weight:700;font-family:inherit;
+  cursor:pointer;letter-spacing:2px;
+  box-shadow:0 3px 12px rgba(192,57,43,0.5);transition:transform .1s;
 }
-#hit-popup-ok:hover{transform:scale(1.04);}
+#hit-popup-ok:hover{transform:scale(1.06);}
 
 /* ========= END OVERLAY ========= */
 #end-overlay .panel{text-align:center;}
@@ -182,15 +209,17 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
       <span class="hud-val" id="round-display">1/3</span>
     </div>
   </div>
-  <div id="hit-popup">
-    <div class="hit-inner">
-      <canvas id="hit-char-canvas" width="54" height="72"></canvas>
-      <div>
-        <div class="hit-pts-label">擊中得分！</div>
-        <div class="hit-score" id="hit-score-val">+500</div>
+  <div id="hit-popup-backdrop">
+    <div id="hit-popup">
+      <div class="hit-inner">
+        <canvas id="hit-char-canvas" width="60" height="78"></canvas>
+        <div>
+          <div class="hit-pts-label">🎯 擊中得分！</div>
+          <div class="hit-score" id="hit-score-val">+500</div>
+        </div>
       </div>
+      <button id="hit-popup-ok" onclick="closeHitPopup()">✔ 確定</button>
     </div>
-    <button id="hit-popup-ok" onclick="closeHitPopup()">✔ 確定</button>
   </div>
 </div>
 <div id="instructions">🖱 移動滑鼠調整角度 ｜ 按住左鍵蓄力，放開發射 ｜ 擊中楓谷角色獲得分數！</div>
@@ -541,26 +570,27 @@ function updateAngle(mx,my) {
   angle=Math.min(angle,-0.04);
 }
 canvas.addEventListener('mousemove',e=>{
+  if(hitPopupPending)return;
   const r=canvas.getBoundingClientRect(),sc=W/r.width;
   updateAngle((e.clientX-r.left)*sc,(e.clientY-r.top)*sc);
 });
 canvas.addEventListener('mousedown',e=>{
-  if(e.button!==0||projectile||gameOver||ammoLeft<=0)return;
+  if(e.button!==0||projectile||gameOver||ammoLeft<=0||hitPopupPending)return;
   charging=true; chargeStart=performance.now();
 });
 canvas.addEventListener('mouseup',e=>{
-  if(e.button!==0||!charging||projectile||ammoLeft<=0)return;
+  if(e.button!==0||!charging||projectile||ammoLeft<=0||hitPopupPending)return;
   charging=false; fire();
 });
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
   const r=canvas.getBoundingClientRect(),sc=W/r.width,t=e.touches[0];
   updateAngle((t.clientX-r.left)*sc,(t.clientY-r.top)*sc);
-  if(!projectile&&!gameOver&&ammoLeft>0){charging=true;chargeStart=performance.now();}
+  if(!projectile&&!gameOver&&ammoLeft>0&&!hitPopupPending){charging=true;chargeStart=performance.now();}
 },{passive:false});
 canvas.addEventListener('touchend',e=>{
   e.preventDefault();
-  if(charging&&!projectile&&ammoLeft>0){charging=false;fire();}
+  if(charging&&!projectile&&ammoLeft>0&&!hitPopupPending){charging=false;fire();}
 },{passive:false});
 
 function fire() {
@@ -874,35 +904,29 @@ function drawParticles(){
 // ---- Hit popup ----
 let hitPopupPending=false;
 function closeHitPopup(){
-  document.getElementById('hit-popup').style.display='none';
+  document.getElementById('hit-popup-backdrop').classList.remove('active');
   hitPopupPending=false;
   // Resume round-end check after player confirms
   checkRoundEnd();
 }
 function showHitPopup(wx,wy,pts,charIdx){
   hitPopupPending=true;
-  const popup=document.getElementById('hit-popup');
   document.getElementById('hit-score-val').textContent='+'+pts;
   // Draw character in popup canvas
   const pc=document.getElementById('hit-char-canvas');
   const pcx=pc.getContext('2d');
   pcx.clearRect(0,0,pc.width,pc.height);
-  drawCharSprite(pcx, CHAR_DEFS[charIdx], pc.width/2, pc.height-8, 1.3);
-  // Position popup near hit point, centred if near edge
-  const gw=document.getElementById('game-wrap');
-  const rect=canvas.getBoundingClientRect();
-  const wRect=gw.getBoundingClientRect();
-  const sc=rect.width/W;
-  let px=(wx*sc)+(rect.left-wRect.left)-85;
-  let py=(wy*sc)+(rect.top-wRect.top)-110;
-  px=Math.max(6,Math.min(px,rect.width-190));
-  py=Math.max(6,Math.min(py,rect.height-130));
-  popup.style.left=px+'px';
-  popup.style.top=py+'px';
-  popup.style.display='block';
+  drawCharSprite(pcx, CHAR_DEFS[charIdx], pc.width/2, pc.height-10, 1.4);
+  // Show centered backdrop
+  const bd=document.getElementById('hit-popup-backdrop');
+  bd.classList.remove('active');
+  void bd.offsetWidth;
+  bd.classList.add('active');
+  // Reset popup animation
+  const popup=document.getElementById('hit-popup');
   popup.style.animation='none';
   void popup.offsetWidth;
-  popup.style.animation='popIn .3s ease-out';
+  popup.style.animation='popIn .3s cubic-bezier(.17,.67,.35,1.3)';
 }
 
 // ---- Round / End ----
@@ -982,3 +1006,9 @@ requestAnimationFrame(ts=>{lastTime=ts;gameLoop(ts);});
 </script>
 </body>
 </html>
+
+<!-- ============================================================
+     程式結束 / END OF PROGRAM
+     A312 前進加拿大 搶佔楓之谷  v2.0
+     © 2026  All rights reserved.
+============================================================ -->
