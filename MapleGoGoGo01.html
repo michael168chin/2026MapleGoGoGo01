@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v2.5
+     版本：v2.6
      日期：2026-05-27
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -30,20 +30,7 @@ body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;ju
   letter-spacing:3px;margin-bottom:6px;text-align:center;
   position:relative;display:flex;align-items:center;gap:12px;
 }
-#gear-btn{
-  width:36px;height:36px;cursor:pointer;flex-shrink:0;
-  transition:transform 0.4s;filter:drop-shadow(0 0 6px #f1c40f88);
-}
-#gear-btn:hover{transform:rotate(60deg);}
-#reset-btn{
-  background:rgba(192,57,43,0.25);border:2px solid var(--maple-red);
-  color:var(--maple-yellow);font-size:1.3rem;font-weight:900;
-  width:34px;height:34px;border-radius:50%;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  transition:all .2s;flex-shrink:0;line-height:1;
-  filter:drop-shadow(0 0 4px #c0392b88);
-}
-#reset-btn:hover{background:rgba(192,57,43,0.55);transform:rotate(-180deg);}
+/* gear and reset positioned over canvas — see responsive block below */
 
 /* ========= CANVAS WRAP ========= */
 #game-wrap{position:relative;width:100%;margin:0 auto;}
@@ -55,8 +42,24 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 .hud-val{font-size:clamp(.8rem,1.4vw,1.1rem);}
 #power-bar-bg{width:clamp(60px,10vw,120px);}
 #ammo-bar{max-width:clamp(80px,15vw,160px);}
-#gear-btn{width:clamp(24px,3vw,36px);height:clamp(24px,3vw,36px);}
-#reset-btn{width:clamp(24px,3vw,34px);height:clamp(24px,3vw,34px);font-size:clamp(.9rem,1.5vw,1.3rem);}
+/* gear bottom-right, reset bottom-left — sized responsively */
+#gear-btn{
+  position:absolute;right:10px;bottom:46px;
+  width:clamp(28px,3.5vw,40px);height:clamp(28px,3.5vw,40px);
+  cursor:pointer;z-index:20;
+  transition:transform 0.5s;filter:drop-shadow(0 0 6px #f1c40f88);
+}
+#gear-btn:hover{transform:rotate(90deg);}
+#reset-btn{
+  position:absolute;left:10px;bottom:46px;
+  background:rgba(20,40,80,0.82);border:2px solid var(--maple-yellow);
+  color:var(--maple-yellow);font-size:clamp(.62rem,1.1vw,.82rem);font-weight:900;
+  padding:5px 12px;border-radius:20px;cursor:pointer;
+  z-index:20;letter-spacing:1px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.5);
+  transition:all .2s;white-space:nowrap;
+}
+#reset-btn:hover{background:rgba(192,57,43,0.9);transform:scale(1.05);}
 
 /* ========= HUD ========= */
 #hud{display:flex;justify-content:space-between;align-items:center;
@@ -138,21 +141,21 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 #hit-popup{
   background:linear-gradient(160deg,#0d1f3c,#1a0808);
   border:3px solid var(--maple-yellow);
-  border-radius:16px;padding:20px 28px 16px;
-  box-shadow:0 0 40px rgba(255,215,0,0.55);
+  border-radius:20px;padding:28px 36px 22px;
+  box-shadow:0 0 60px rgba(255,215,0,0.65);
   animation:popIn .3s cubic-bezier(.17,.67,.35,1.3);
   pointer-events:auto;
-  width:300px;max-width:90vw;
+  width:min(500px,85vw);
   text-align:center;
 }
 @keyframes popIn{from{transform:scale(0.4);opacity:0;}to{transform:scale(1);opacity:1;}}
 #hit-popup .hit-inner{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:14px;}
-#hit-popup .hit-score{font-size:2.2rem;font-weight:900;color:var(--maple-yellow);
-  text-shadow:0 0 14px #e67e22;}
+#hit-popup .hit-score{font-size:2.8rem;font-weight:900;color:var(--maple-yellow);
+  text-shadow:0 0 18px #e67e22;}
 #hit-popup .hit-label{font-size:.82rem;color:#aaa;}
-#hit-popup .hit-pts-label{font-size:.8rem;color:#f1c40f;margin-bottom:2px;}
+#hit-popup .hit-pts-label{font-size:1rem;color:#f1c40f;margin-bottom:4px;}
 #hit-popup-ok{
-  display:inline-block;padding:9px 36px;
+  display:inline-block;padding:12px 48px;font-size:1.1rem;
   background:linear-gradient(135deg,var(--maple-orange),var(--maple-red));
   color:#fff;border:none;border-radius:8px;
   font-size:1rem;font-weight:700;font-family:inherit;
@@ -218,15 +221,16 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
   </div>
   <div id="hit-popup-backdrop">
     <div id="hit-popup">
+      <div style="font-size:1.5rem;font-weight:900;color:#f1c40f;margin-bottom:10px;text-shadow:0 0 10px #e67e22;">🎊 恭喜！</div>
       <div class="hit-inner">
-        <canvas id="hit-char-canvas" width="60" height="78"></canvas>
+        <canvas id="hit-char-canvas" width="80" height="100"></canvas>
         <div>
-          <div class="hit-pts-label">🎯 擊中得分！</div>
-          <div id="hit-player-name" style="font-size:.95rem;font-weight:900;color:#fff;margin:3px 0;"></div>
-          <div class="hit-score" id="hit-score-val">+500</div>
+          <div class="hit-pts-label">🎯 擊中目標！</div>
+          <div id="hit-player-name" style="font-size:1.1rem;font-weight:900;color:#fff;margin:5px 0;"></div>
+          <div class="hit-score" id="hit-score-val">獲得 500元</div>
         </div>
       </div>
-      <button id="hit-popup-ok" onclick="closeHitPopup()">✔ 確定</button>
+      <button id="hit-popup-ok" onclick="closeHitPopup()">🎉 太棒了！</button>
     </div>
   </div>
 </div>
@@ -266,6 +270,21 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
   </div>
 </div>
 
+<!-- Password Dialog -->
+<div class="overlay" id="pwd-backdrop">
+  <div class="panel" style="max-width:340px;text-align:center;">
+    <h2 style="margin-bottom:14px;">🔐 請輸入密碼</h2>
+    <input type="password" id="pwd-input" placeholder="輸入密碼" maxlength="20"
+      style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.08);border:2px solid #555;border-radius:8px;color:#fff;font-size:1.1rem;font-family:inherit;letter-spacing:4px;text-align:center;margin-bottom:8px;"
+      onkeydown="if(event.key==='Enter')submitPassword()">
+    <div id="pwd-error" style="display:none;color:#e74c3c;font-size:.85rem;margin-bottom:8px;">❌ 密碼錯誤，請重試</div>
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:6px;">
+      <button class="panel-btn" onclick="submitPassword()">確認</button>
+      <button class="panel-btn secondary" onclick="cancelPassword()">取消</button>
+    </div>
+  </div>
+</div>
+
 <!-- Settings Panel -->
 <div class="overlay" id="settings-overlay">
   <div class="panel">
@@ -289,6 +308,9 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
       <input type="range" id="set-rounds" min="1" max="5" step="1" value="3" oninput="document.getElementById('set-rounds-val').textContent=this.value">
       <span class="setting-val" id="set-rounds-val">3</span>
     </div>
+    <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
+    <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">🏆 獎項設定（金額 / 數量）</div>
+    <div id="prize-settings-rows"></div>
     <div style="display:flex;justify-content:center;gap:12px;margin-top:18px;">
       <button class="panel-btn" onclick="applySettings()">✔ 套用</button>
       <button class="panel-btn secondary" onclick="closeSettings()">✕ 關閉</button>
@@ -308,6 +330,37 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 </div>
 
 <script>
+// ===================== SOUND =====================
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let _actx = null;
+function getACtx(){ if(!_actx) _actx=new AudioCtx(); return _actx; }
+
+function playTone(freq, type, duration, gainVal, freqEnd){
+  try {
+    const ac=getACtx();
+    const osc=ac.createOscillator();
+    const g=ac.createGain();
+    osc.connect(g);g.connect(ac.destination);
+    osc.type=type||'sine';
+    osc.frequency.setValueAtTime(freq, ac.currentTime);
+    if(freqEnd) osc.frequency.linearRampToValueAtTime(freqEnd, ac.currentTime+duration);
+    g.gain.setValueAtTime(gainVal||0.3, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ac.currentTime+duration);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime+duration);
+  } catch(e){}
+}
+function sfxFire(){ playTone(120,'sawtooth',0.18,0.25,60); playTone(180,'square',0.12,0.12); }
+function sfxHit(pts){
+  const freqs={200:440,300:523,500:659,800:880};
+  const f=freqs[pts]||500;
+  playTone(f,'sine',0.12,0.35);
+  setTimeout(()=>playTone(f*1.25,'sine',0.15,0.28),80);
+  setTimeout(()=>playTone(f*1.5,'sine',0.2,0.22),180);
+}
+function sfxCharge(pct){ if(Math.random()<0.15) playTone(200+pct*300,'sine',0.05,0.05); }
+function sfxBounce(){ playTone(200,'triangle',0.08,0.1,100); }
+
 // ===================== CONFIG =====================
 const cfg = {
   title: 'A321 前進楓之國',
@@ -323,6 +376,10 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiy3PBuK_JOID8
 async function gsRegisterPlayer(name, character) {
   if (!APPS_SCRIPT_URL) return;
   try {
+    // Check existing players first — skip if identical record exists
+    const existing = await gsLoadPlayers().catch(()=>[]);
+    const dup = existing.some(p => p.name===name && p.character===character);
+    if (dup) { console.log('已有相同玩家記錄，略過寫入'); return; }
     await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -557,23 +614,77 @@ async function confirmChar() {
 
 // ===================== SETTINGS =====================
 function openSettings() {
-  const pwd = prompt('請輸入設定密碼：');
-  if (pwd !== 'A321A321') { if(pwd!==null) alert('密碼錯誤！'); return; }
-  document.getElementById('set-title').value = cfg.title;
-  document.getElementById('set-speed').value = cfg.speedMult;
-  document.getElementById('set-speed-val').textContent = cfg.speedMult.toFixed(1);
-  document.getElementById('set-ammo').value = cfg.ammoPerRound;
-  document.getElementById('set-ammo-val').textContent = cfg.ammoPerRound;
-  document.getElementById('set-rounds').value = cfg.totalRounds;
-  document.getElementById('set-rounds-val').textContent = cfg.totalRounds;
-  document.getElementById('settings-overlay').classList.add('active');
+  showPasswordDialog(function(pwd){
+    if (pwd === null) return;
+    if (pwd !== 'A321A321') { showPwdError(); return; }
+    document.getElementById('set-title').value = cfg.title;
+    document.getElementById('set-speed').value = cfg.speedMult;
+    document.getElementById('set-speed-val').textContent = cfg.speedMult.toFixed(1);
+    document.getElementById('set-ammo').value = cfg.ammoPerRound;
+    document.getElementById('set-ammo-val').textContent = cfg.ammoPerRound;
+    document.getElementById('set-rounds').value = cfg.totalRounds;
+    document.getElementById('set-rounds-val').textContent = cfg.totalRounds;
+    loadPrizeSettingsUI();
+    document.getElementById('settings-overlay').classList.add('active');
+  });
+}
+function showPasswordDialog(callback){
+  const bd=document.getElementById('pwd-backdrop');
+  const inp=document.getElementById('pwd-input');
+  inp.value='';
+  document.getElementById('pwd-error').style.display='none';
+  bd.classList.add('active');
+  setTimeout(()=>inp.focus(),100);
+  window._pwdCallback=callback;
+}
+function submitPassword(){
+  const val=document.getElementById('pwd-input').value;
+  document.getElementById('pwd-backdrop').classList.remove('active');
+  if(window._pwdCallback) window._pwdCallback(val);
+}
+function cancelPassword(){
+  document.getElementById('pwd-backdrop').classList.remove('active');
+  if(window._pwdCallback) window._pwdCallback(null);
+}
+function showPwdError(){
+  const bd=document.getElementById('pwd-backdrop');
+  const err=document.getElementById('pwd-error');
+  document.getElementById('pwd-input').value='';
+  err.style.display='block';
+  bd.classList.add('active');
+  setTimeout(()=>document.getElementById('pwd-input').focus(),100);
 }
 function closeSettings() { document.getElementById('settings-overlay').classList.remove('active'); }
+function loadPrizeSettingsUI(){
+  const cont=document.getElementById('prize-settings-rows');
+  cont.innerHTML='';
+  TARGET_SPECS.forEach((spec,i)=>{
+    const row=document.createElement('div');
+    row.className='setting-row';
+    row.style.gap='8px';
+    row.innerHTML=`
+      <label style="min-width:28px;">第${i+1}級</label>
+      <span style="font-size:.78rem;color:#aaa;">金額</span>
+      <input type="number" id="prize-amt-${i}" value="${spec.pts}" min="1" max="99999" step="1"
+        style="width:72px;padding:4px 6px;background:rgba(255,255,255,0.08);border:1.5px solid #555;border-radius:6px;color:#fff;font-size:.9rem;font-family:inherit;">
+      <span style="font-size:.78rem;color:#aaa;">數量</span>
+      <input type="number" id="prize-cnt-${i}" value="${spec.count}" min="1" max="50" step="1"
+        style="width:54px;padding:4px 6px;background:rgba(255,255,255,0.08);border:1.5px solid #555;border-radius:6px;color:#fff;font-size:.9rem;font-family:inherit;">
+    `;
+    cont.appendChild(row);
+  });
+}
 function applySettings() {
   cfg.title = document.getElementById('set-title').value || cfg.title;
   cfg.speedMult = parseFloat(document.getElementById('set-speed').value);
   cfg.ammoPerRound = parseInt(document.getElementById('set-ammo').value);
   cfg.totalRounds = parseInt(document.getElementById('set-rounds').value);
+  // Apply prize settings
+  TARGET_SPECS.forEach((spec,i)=>{
+    const amt=parseInt(document.getElementById('prize-amt-'+i)?.value)||spec.pts;
+    const cnt=parseInt(document.getElementById('prize-cnt-'+i)?.value)||spec.count;
+    spec.pts=amt; spec.count=cnt;
+  });
   document.getElementById('title-text').textContent = cfg.title;
   document.title = cfg.title;
   ammoLeft = cfg.ammoPerRound;
@@ -613,8 +724,8 @@ let particles = [];
 
 let cannonBase = { x: 72, y: 428 }; // updated by resizeCanvas()
 
-// Target specs
-const TARGET_SPECS = [
+// Target specs (mutable — editable via settings)
+let TARGET_SPECS = [
   { pts:800, count:3,  r:17 },
   { pts:500, count:6,  r:15 },
   { pts:300, count:12, r:13 },
@@ -741,6 +852,7 @@ function fire() {
   trail=[];
   ammoLeft--;
   power=0.5;
+  sfxFire();
   updateHUD();
   spawnMuzzle(tipX,tipY);
 }
@@ -776,51 +888,58 @@ function drawBackground(){
   ctx.beginPath();ctx.arc(cw*0.88,ch*0.10,ch*0.046,0,Math.PI*2);ctx.fill();
   ctx.restore();
 
-  // ---- MOUNTAINS: varied sizes, 3 layers ----
-  // Each layer: array of [peakX_frac, peakH_frac, baseY_frac]
-  const mtnLayers = [
-    // Back layer - tallest, blue-grey
-    { color:'#8da4be', snowAlpha:0.5, peaks:[
-      {cx:0.08, py:0.10}, {cx:0.22, py:0.04}, {cx:0.38, py:0.13},
-      {cx:0.52, py:0.06}, {cx:0.65, py:0.15}, {cx:0.78, py:0.08},
-      {cx:0.92, py:0.12}
-    ], baseY:0.88, halfW:0.10 },
-    // Mid layer
-    { color:'#7d9ab0', snowAlpha:0.45, peaks:[
-      {cx:0.05, py:0.18}, {cx:0.16, py:0.12}, {cx:0.30, py:0.20},
-      {cx:0.45, py:0.14}, {cx:0.58, py:0.22}, {cx:0.72, py:0.16},
-      {cx:0.85, py:0.19}, {cx:0.97, py:0.13}
-    ], baseY:0.92, halfW:0.08 },
-    // Front layer - shortest, darker
-    { color:'#6a8498', snowAlpha:0.38, peaks:[
-      {cx:0.12, py:0.24}, {cx:0.26, py:0.30}, {cx:0.40, py:0.26},
-      {cx:0.55, py:0.32}, {cx:0.68, py:0.27}, {cx:0.82, py:0.29},
-      {cx:0.95, py:0.25}
-    ], baseY:0.95, halfW:0.07 },
-  ];
-
-  mtnLayers.forEach(layer=>{
-    // Fill polygon connecting all peaks
-    ctx.fillStyle=layer.color;
+  // ---- MOUNTAINS: 3 layers, fewer peaks, rounded, varied snow ----
+  // drawMountain: draws one mountain as a smooth bell curve with snow
+  function drawMountain(cx, peakY, baseY, hw, color, snowFrac){
+    // Body — bezier rounded shape
+    ctx.fillStyle=color;
     ctx.beginPath();
-    ctx.moveTo(0, ch*layer.baseY);
-    layer.peaks.forEach(p=>{
-      const bx=p.cx*cw, by=p.py*ch;
-      const hw=layer.halfW*cw;
-      ctx.lineTo(Math.max(0,bx-hw), ch*layer.baseY);
-      ctx.lineTo(bx, by);
-      ctx.lineTo(Math.min(cw,bx+hw), ch*layer.baseY);
-    });
-    ctx.lineTo(cw,ch*layer.baseY);ctx.closePath();ctx.fill();
-    // Snow caps
-    ctx.save();ctx.globalAlpha=layer.snowAlpha;ctx.fillStyle='#fff';
-    layer.peaks.forEach(p=>{
-      const bx=p.cx*cw, by=p.py*ch;
-      const hw=layer.halfW*cw*0.35;
-      const snowBase=by+ch*0.045;
-      ctx.beginPath();ctx.moveTo(bx-hw,snowBase);ctx.lineTo(bx,by);ctx.lineTo(bx+hw,snowBase);ctx.closePath();ctx.fill();
-    });
+    ctx.moveTo(cx-hw, baseY);
+    ctx.bezierCurveTo(cx-hw*0.6, baseY, cx-hw*0.25, peakY+ch*0.04, cx, peakY);
+    ctx.bezierCurveTo(cx+hw*0.25, peakY+ch*0.04, cx+hw*0.6, baseY, cx+hw, baseY);
+    ctx.closePath();ctx.fill();
+    // Snow cap — height varies per mountain
+    const snowH = (baseY-peakY)*snowFrac;
+    const snowY = peakY + (baseY-peakY)*(1-snowFrac);
+    const snowW = hw * snowFrac * 0.8;
+    ctx.save();ctx.globalAlpha=0.72;ctx.fillStyle='#eaf4ff';
+    ctx.beginPath();
+    ctx.moveTo(cx-snowW*0.5, snowY+snowH*0.55);
+    ctx.bezierCurveTo(cx-snowW*0.4, snowY+snowH*0.3, cx-snowW*0.2, snowY+snowH*0.05, cx, peakY);
+    ctx.bezierCurveTo(cx+snowW*0.2, snowY+snowH*0.05, cx+snowW*0.4, snowY+snowH*0.3, cx+snowW*0.5, snowY+snowH*0.55);
+    ctx.closePath();ctx.fill();
     ctx.restore();
+  }
+
+  // Layer 1: far background — 3 large distant mountains
+  const bg_mountains=[
+    {cx:0.18, py:0.08, hw:0.18, snow:0.45},
+    {cx:0.52, py:0.05, hw:0.22, snow:0.65},
+    {cx:0.82, py:0.10, hw:0.16, snow:0.38},
+  ];
+  bg_mountains.forEach(m=>{
+    drawMountain(m.cx*cw, m.py*ch, ch*0.62, m.hw*cw, '#9bb8d0', m.snow);
+  });
+
+  // Layer 2: mid — 4 medium mountains
+  const mid_mountains=[
+    {cx:0.08, py:0.17, hw:0.11, snow:0.30},
+    {cx:0.34, py:0.13, hw:0.14, snow:0.55},
+    {cx:0.63, py:0.19, hw:0.12, snow:0.25},
+    {cx:0.90, py:0.15, hw:0.13, snow:0.50},
+  ];
+  mid_mountains.forEach(m=>{
+    drawMountain(m.cx*cw, m.py*ch, ch*0.63, m.hw*cw, '#7a9db8', m.snow);
+  });
+
+  // Layer 3: front — 3 smaller foreground hills
+  const fg_mountains=[
+    {cx:0.24, py:0.28, hw:0.09, snow:0.18},
+    {cx:0.55, py:0.25, hw:0.11, snow:0.35},
+    {cx:0.78, py:0.30, hw:0.08, snow:0.12},
+  ];
+  fg_mountains.forEach(m=>{
+    drawMountain(m.cx*cw, m.py*ch, ch*0.64, m.hw*cw, '#628399', m.snow);
   });
 
   // Clouds
@@ -1034,6 +1153,7 @@ function updateProjectile(dt){
       t.hit=true;
       score+=t.pts;
       spawnHit(tx,ty,tierColor(t.pts));
+      sfxHit(t.pts);
       showHitPopup(tx,ty,t.pts,t.charIdx);
       updateHUD();
       projectile=null;trail=[];
@@ -1099,13 +1219,13 @@ function closeHitPopup(){
 }
 function showHitPopup(wx,wy,pts,charIdx){
   hitPopupPending=true;
-  document.getElementById('hit-score-val').textContent='+'+pts;
+  document.getElementById('hit-score-val').textContent='獲得 '+pts+'元';
   document.getElementById('hit-player-name').textContent='🏆 ' + (playerName||'冒險者');
   // Draw character in popup canvas
   const pc=document.getElementById('hit-char-canvas');
   const pcx=pc.getContext('2d');
   pcx.clearRect(0,0,pc.width,pc.height);
-  drawCharSprite(pcx, CHAR_DEFS[charIdx], pc.width/2, pc.height-10, 1.4);
+  drawCharSprite(pcx, CHAR_DEFS[charIdx], pc.width/2, pc.height-12, 1.7);
   // Show centered backdrop
   const bd=document.getElementById('hit-popup-backdrop');
   bd.classList.remove('active');
@@ -1117,7 +1237,7 @@ function showHitPopup(wx,wy,pts,charIdx){
   void popup.offsetWidth;
   popup.style.animation='popIn .3s cubic-bezier(.17,.67,.35,1.3)';
   // Write to Google Sheets (non-blocking)
-  gsWriteScore(playerName||'冒險者', pts + '分');
+  gsWriteScore(playerName||'冒險者', pts + '元');
 }
 
 // ---- Round / End ----
@@ -1201,6 +1321,7 @@ function gameLoop(ts){
   if(charging){
     const el=(performance.now()-chargeStart)/1000;
     power=Math.min(el/2.0,1.0);updateHUD();
+    sfxCharge(power);
   }
   requestAnimationFrame(gameLoop);
 }
