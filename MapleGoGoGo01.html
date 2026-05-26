@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v2.7
+     版本：v2.8
      日期：2026-05-27
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -746,8 +746,8 @@ function resizeCanvas() {
   if (ch > availH) { ch = Math.max(availH, 80); cw = Math.round(ch * 900 / 500); }
   canvas.width  = cw;
   canvas.height = ch;
-  cannonBase.x = Math.round(cw * 0.08);
-  cannonBase.y = Math.round(ch - ch * 0.16);
+  cannonBase.x = Math.round(cw * 0.165);
+  cannonBase.y = Math.round(ch - ch * 0.155);
 }
 // Use logical constants that scale with canvas size
 let W = 900, H = 500;
@@ -760,7 +760,7 @@ let power = 0.5, angle = -Math.PI/4;
 let projectile = null, trail = [];
 let particles = [];
 
-let cannonBase = { x: 72, y: 428 }; // updated by resizeCanvas()
+let cannonBase = { x: 148, y: 422 }; // updated by resizeCanvas()
 
 // Target specs (mutable — editable via settings)
 let TARGET_SPECS = [
@@ -1014,6 +1014,9 @@ function drawBackground(){
   ctx.fillRect(0,ch*0.60,cw*0.20,8);
   ctx.fillRect(cw*0.70,ch*0.57,cw*0.30,8);
 
+  // ---- CASTLE ----
+  drawCastle();
+
   // ---- TREES: continuous row across FULL width at horizon ----
   // Draw from x=0 to x=cw, 2 layers (dark back, lighter front)
   // Trees in river zone float above water slightly (treeline in sky)
@@ -1080,6 +1083,229 @@ function drawCloud(cx,cy,s){
   [{x:0,y:0,r:26},{x:20,y:-7,r:20},{x:-20,y:-5,r:18},{x:36,y:4,r:16},{x:-36,y:4,r:15}].forEach(b=>{
     ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
   });
+  ctx.restore();
+}
+
+// ---- Castle (stone, Boldt-style) ----
+function drawCastle(){
+  const cw=canvas.width, ch=canvas.height;
+  // Scale factor — castle occupies left ~18% of canvas
+  const S = cw * 0.0022; // base scale unit
+  const bx = cw * 0.005; // base left anchor
+  const by = ch * 0.60;  // ground line
+
+  ctx.save();
+
+  // ---- Helper: stone wall fill ----
+  function stoneRect(x,y,w,h,baseColor,darkColor){
+    // Base fill
+    ctx.fillStyle=baseColor;
+    ctx.fillRect(x,y,w,h);
+    // Stone pattern — rows of alternating rectangles
+    ctx.fillStyle=darkColor;
+    const sh=Math.max(4,h/Math.round(h/10)); // stone row height
+    for(let ry=y;ry<y+h;ry+=sh){
+      const rowIdx=Math.round((ry-y)/sh);
+      const offset=(rowIdx%2)*sh*0.6;
+      for(let rx=x+offset;rx<x+w;rx+=sh*1.4){
+        const sw=Math.min(sh*1.3,x+w-rx);
+        if(sw>2) ctx.fillRect(rx+1,ry+1,sw-2,sh-2);
+      }
+    }
+    // Border
+    ctx.strokeStyle=darkColor;ctx.lineWidth=1;
+    ctx.strokeRect(x,y,w,h);
+  }
+
+  // Stone colors
+  const stone1='#a07858';  // warm sandstone
+  const stone2='#7a5a40';  // darker mortar/shadow
+  const stone3='#8a6848';  // mid tone
+  const roof1 ='#5a5060';  // slate grey roof
+  const roof2 ='#484050';  // dark slate
+  const window1='#1a2a4a'; // dark window
+  const windowL='#6a8aaa'; // window light
+
+  // Wall shadow under castle
+  ctx.fillStyle='rgba(0,0,0,0.22)';
+  ctx.beginPath();ctx.ellipse(bx+S*72, by+2, S*68, S*8, 0, 0, Math.PI*2);ctx.fill();
+
+  // ---- MAIN KEEP (centre body) ----
+  const keepX=bx+S*28, keepY=by-S*105, keepW=S*55, keepH=S*105;
+  stoneRect(keepX, keepY, keepW, keepH, stone1, stone2);
+
+  // Keep crenellations (merlons)
+  ctx.fillStyle=stone1;
+  const mW=S*8, mH=S*10, mGap=S*5;
+  for(let mx=keepX; mx<keepX+keepW-mW; mx+=mW+mGap){
+    stoneRect(mx, keepY-mH, mW, mH, stone1, stone2);
+  }
+
+  // Keep windows — 3 rows
+  [[0.25,0.28],[0.5,0.28],[0.75,0.28],
+   [0.3,0.55],[0.7,0.55],
+   [0.5,0.78]].forEach(([fx,fy])=>{
+    const wx=keepX+keepW*fx-S*4, wy=keepY+keepH*fy-S*8;
+    ctx.fillStyle=window1;
+    ctx.beginPath();ctx.roundRect(wx,wy,S*8,S*12,S*4);ctx.fill();
+    ctx.fillStyle=windowL;ctx.globalAlpha=0.5;
+    ctx.fillRect(wx+S*1.5,wy+S*1.5,S*2,S*4);
+    ctx.globalAlpha=1;
+  });
+
+  // ---- LEFT ROUND TOWER ----
+  const lt_cx=bx+S*18, lt_top=by-S*130, lt_r=S*18;
+  // Tower body (cylinder approximated as rect + arcs)
+  ctx.fillStyle=stone1;
+  ctx.beginPath();
+  ctx.arc(lt_cx, lt_top+S*10, lt_r, Math.PI, 0);
+  ctx.rect(lt_cx-lt_r, lt_top+S*10, lt_r*2, by-lt_top-S*10);
+  ctx.fill();
+  // Stone texture on tower
+  ctx.strokeStyle=stone2;ctx.lineWidth=1;
+  for(let ty=lt_top+S*10;ty<by;ty+=S*9){
+    ctx.beginPath();ctx.arc(lt_cx,ty,lt_r,Math.PI*0.1,Math.PI*0.9);ctx.stroke();
+    ctx.beginPath();ctx.arc(lt_cx,ty,lt_r,-Math.PI*0.9,-Math.PI*0.1);ctx.stroke();
+  }
+  // Tower crenellations
+  ctx.fillStyle=stone1;
+  for(let a=-0.8;a<=0.8;a+=0.35){
+    const mx=lt_cx+Math.cos(a*Math.PI)*lt_r;
+    const my=lt_top+S*10+Math.sin(a*Math.PI)*(lt_r*0.15);
+    stoneRect(mx-S*3.5, my-S*12, S*7, S*12, stone1, stone2);
+  }
+  // Conical slate roof
+  ctx.fillStyle=roof1;
+  ctx.beginPath();
+  ctx.moveTo(lt_cx, lt_top-S*28);
+  ctx.lineTo(lt_cx-lt_r-S*3, lt_top+S*10);
+  ctx.lineTo(lt_cx+lt_r+S*3, lt_top+S*10);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle=roof2;ctx.lineWidth=1.5;ctx.stroke();
+  // Roof shading lines
+  ctx.strokeStyle='rgba(0,0,0,0.15)';ctx.lineWidth=1;
+  for(let s=-lt_r;s<=lt_r;s+=S*4){
+    ctx.beginPath();
+    ctx.moveTo(lt_cx+s, lt_top+S*10);
+    ctx.lineTo(lt_cx, lt_top-S*28);
+    ctx.stroke();
+  }
+  // Tower windows
+  ctx.fillStyle=window1;
+  ctx.beginPath();ctx.roundRect(lt_cx-S*4, lt_top+S*30, S*8, S*11, S*4);ctx.fill();
+  ctx.fillStyle=window1;
+  ctx.beginPath();ctx.roundRect(lt_cx-S*4, lt_top+S*60, S*8, S*11, S*4);ctx.fill();
+
+  // ---- TALL CLOCK TOWER (left-centre) ----
+  const ct_cx=bx+S*50, ct_top=by-S*180, ct_w=S*22, ct_h=S*180;
+  stoneRect(ct_cx-ct_w/2, ct_top, ct_w, ct_h, stone1, stone2);
+  // Clock tower crenellations
+  for(let mx=ct_cx-ct_w/2;mx<ct_cx+ct_w/2-S*6;mx+=S*7+S*3){
+    stoneRect(mx, ct_top-S*11, S*7, S*11, stone1, stone2);
+  }
+  // Clock face
+  const clkX=ct_cx, clkY=ct_top+S*22, clkR=S*9;
+  ctx.fillStyle='#d4c8a0';
+  ctx.beginPath();ctx.arc(clkX,clkY,clkR,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#6a5030';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(clkX,clkY,clkR,0,Math.PI*2);ctx.stroke();
+  // Clock hands
+  ctx.strokeStyle='#3a2010';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(clkX,clkY);ctx.lineTo(clkX+clkR*0.5,clkY-clkR*0.5);ctx.stroke();
+  ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(clkX,clkY);ctx.lineTo(clkX-clkR*0.3,clkY-clkR*0.65);ctx.stroke();
+  // Tower tall windows
+  [[0.35],[0.6],[0.82]].forEach(([fy])=>{
+    ctx.fillStyle=window1;
+    ctx.beginPath();ctx.roundRect(ct_cx-S*4.5, ct_top+ct_h*fy, S*9, S*14, S*4);ctx.fill();
+    ctx.fillStyle=windowL;ctx.globalAlpha=0.4;
+    ctx.fillRect(ct_cx-S*2, ct_top+ct_h*fy+S*2, S*2.5, S*5);
+    ctx.globalAlpha=1;
+  });
+  // Conical roof for clock tower
+  ctx.fillStyle=roof1;
+  ctx.beginPath();
+  ctx.moveTo(ct_cx, ct_top-S*42);
+  ctx.lineTo(ct_cx-ct_w/2-S*4, ct_top);
+  ctx.lineTo(ct_cx+ct_w/2+S*4, ct_top);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle=roof2;ctx.lineWidth=1.5;ctx.stroke();
+  for(let s=-ct_w/2;s<=ct_w/2;s+=S*5){
+    ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(ct_cx+s,ct_top);ctx.lineTo(ct_cx,ct_top-S*42);ctx.stroke();
+  }
+  // Weather vane
+  ctx.strokeStyle='#888';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(ct_cx,ct_top-S*42);ctx.lineTo(ct_cx,ct_top-S*52);ctx.stroke();
+  ctx.fillStyle='#aaa';
+  ctx.beginPath();ctx.moveTo(ct_cx,ct_top-S*52);ctx.lineTo(ct_cx+S*7,ct_top-S*48);ctx.lineTo(ct_cx,ct_top-S*50);ctx.lineTo(ct_cx-S*4,ct_top-S*48);ctx.closePath();ctx.fill();
+
+  // ---- RIGHT SMALL TURRET ----
+  const rt_cx=bx+S*95, rt_top=by-S*100, rt_r=S*13;
+  ctx.fillStyle=stone1;
+  ctx.beginPath();
+  ctx.arc(rt_cx, rt_top+S*8, rt_r, Math.PI, 0);
+  ctx.rect(rt_cx-rt_r, rt_top+S*8, rt_r*2, by-rt_top-S*8);
+  ctx.fill();
+  ctx.strokeStyle=stone2;ctx.lineWidth=1;
+  for(let ty=rt_top+S*8;ty<by;ty+=S*8){
+    ctx.beginPath();ctx.arc(rt_cx,ty,rt_r,Math.PI*0.1,Math.PI*0.9);ctx.stroke();
+    ctx.beginPath();ctx.arc(rt_cx,ty,rt_r,-Math.PI*0.9,-Math.PI*0.1);ctx.stroke();
+  }
+  // Crenellations
+  for(let a=-0.75;a<=0.75;a+=0.38){
+    const mx=rt_cx+Math.cos(a*Math.PI)*rt_r;
+    const my=rt_top+S*8+Math.sin(a*Math.PI)*(rt_r*0.15);
+    stoneRect(mx-S*2.5, my-S*9, S*5, S*9, stone1, stone2);
+  }
+  // Roof
+  ctx.fillStyle=roof1;
+  ctx.beginPath();
+  ctx.moveTo(rt_cx, rt_top-S*20);
+  ctx.lineTo(rt_cx-rt_r-S*2, rt_top+S*8);
+  ctx.lineTo(rt_cx+rt_r+S*2, rt_top+S*8);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle=roof2;ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle=window1;
+  ctx.beginPath();ctx.roundRect(rt_cx-S*3.5, rt_top+S*30, S*7, S*10, S*3);ctx.fill();
+
+  // ---- CONNECTING WALL (left tower to keep) ----
+  const wallY = by-S*55, wallH=S*55;
+  stoneRect(lt_cx+lt_r, wallY, keepX-(lt_cx+lt_r), wallH, stone3, stone2);
+  // Wall crenellations
+  for(let mx=lt_cx+lt_r+S*2;mx<keepX-S*6;mx+=S*12){
+    stoneRect(mx, wallY-S*9, S*7, S*9, stone3, stone2);
+  }
+  // Arched gate in wall
+  const gateX=(lt_cx+lt_r + keepX)/2 - S*7;
+  const gateW=S*14, gateH=S*22;
+  ctx.fillStyle='#1a1008';
+  ctx.beginPath();
+  ctx.rect(gateX, wallY+wallH-gateH+S*6, gateW, gateH-S*6);
+  ctx.arc(gateX+gateW/2, wallY+wallH-gateH+S*6, gateW/2, Math.PI, 0);
+  ctx.fill();
+  // Gate arch keystone
+  ctx.fillStyle=stone1;
+  ctx.beginPath();ctx.arc(gateX+gateW/2, wallY+wallH-gateH+S*6, S*3, Math.PI*1.1, Math.PI*1.9);ctx.fill();
+
+  // ---- CONNECTING WALL (keep to right turret) ----
+  const wallR_X=keepX+keepW, wallR_Y=by-S*48, wallR_H=S*48;
+  stoneRect(wallR_X, wallR_Y, rt_cx-rt_r-wallR_X, wallR_H, stone3, stone2);
+  for(let mx=wallR_X+S*2;mx<rt_cx-rt_r-S*6;mx+=S*11){
+    stoneRect(mx, wallR_Y-S*8, S*6, S*8, stone3, stone2);
+  }
+
+  // ---- FOREGROUND WALL BASE (ground level, full width of castle) ----
+  const baseY=by-S*22, baseH=S*22;
+  stoneRect(bx, baseY, rt_cx+rt_r+S*5-bx, baseH, stone3, stone2);
+  // Arrow slits in base wall
+  [[0.2],[0.45],[0.7],[0.88]].forEach(([fx])=>{
+    const slitX=(bx)+(rt_cx+rt_r-bx)*fx;
+    ctx.fillStyle='#1a1008';
+    ctx.fillRect(slitX-S*1.5, baseY+S*5, S*3, S*10);
+    ctx.fillRect(slitX-S*4, baseY+S*9, S*8, S*3);
+  });
+
   ctx.restore();
 }
 
