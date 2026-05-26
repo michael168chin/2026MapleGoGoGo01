@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v2.6
+     版本：v2.7
      日期：2026-05-27
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -21,7 +21,7 @@
   --maple-green:#27ae60;--maple-blue:#2980b9;--maple-purple:#8e44ad;
   --ui-bg:rgba(10,20,40,0.92);--ui-border:#f1c40f;
 }
-body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;width:100vw;font-family:'Noto Sans TC',sans-serif;overflow:hidden;}
+body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;height:100vh;width:100vw;font-family:'Noto Sans TC',sans-serif;overflow:hidden;padding-top:0;}
 
 /* ========= TITLE ========= */
 #game-title{
@@ -33,10 +33,10 @@ body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;ju
 /* gear and reset positioned over canvas — see responsive block below */
 
 /* ========= CANVAS WRAP ========= */
-#game-wrap{position:relative;width:100%;margin:0 auto;}
+#game-wrap{position:relative;width:100%;margin:0 auto;flex:1;min-height:0;display:flex;flex-direction:column;}
 canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
   box-shadow:0 0 40px rgba(192,57,43,0.4);cursor:crosshair;
-  width:100%;height:auto;touch-action:none;}
+  width:100%;flex:1;min-height:0;object-fit:contain;touch-action:none;}
 #game-title{font-size:clamp(.85rem,1.8vw,1.5rem);letter-spacing:clamp(1px,0.3vw,3px);}
 #hud{font-size:clamp(.65rem,1.2vw,.9rem);padding:clamp(4px,0.8vw,8px) clamp(8px,1.5vw,16px);gap:clamp(4px,0.8vw,10px);}
 .hud-val{font-size:clamp(.8rem,1.4vw,1.1rem);}
@@ -221,13 +221,11 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
   </div>
   <div id="hit-popup-backdrop">
     <div id="hit-popup">
-      <div style="font-size:1.5rem;font-weight:900;color:#f1c40f;margin-bottom:10px;text-shadow:0 0 10px #e67e22;">🎊 恭喜！</div>
+      <div class="hit-pts-label" style="font-size:1.15rem;margin-bottom:12px;">🎯 擊中目標！</div>
       <div class="hit-inner">
         <canvas id="hit-char-canvas" width="80" height="100"></canvas>
-        <div>
-          <div class="hit-pts-label">🎯 擊中目標！</div>
-          <div id="hit-player-name" style="font-size:1.1rem;font-weight:900;color:#fff;margin:5px 0;"></div>
-          <div class="hit-score" id="hit-score-val">獲得 500元</div>
+        <div style="text-align:left;">
+          <div class="hit-score" id="hit-score-val" style="font-size:1.5rem;line-height:1.3;"></div>
         </div>
       </div>
       <button id="hit-popup-ok" onclick="closeHitPopup()">🎉 太棒了！</button>
@@ -357,6 +355,41 @@ function sfxHit(pts){
   playTone(f,'sine',0.12,0.35);
   setTimeout(()=>playTone(f*1.25,'sine',0.15,0.28),80);
   setTimeout(()=>playTone(f*1.5,'sine',0.2,0.22),180);
+}
+function sfxCheer(){
+  // Happy fanfare: ascending arpeggio + noise bursts (applause simulation)
+  try {
+    const ac=getACtx();
+    // Fanfare notes
+    const notes=[523,659,784,1047];
+    notes.forEach((f,i)=>{
+      setTimeout(()=>{
+        playTone(f,'triangle',0.18,0.3);
+        playTone(f*1.5,'sine',0.12,0.15);
+      },i*110);
+    });
+    // Applause noise bursts
+    for(let b=0;b<12;b++){
+      setTimeout(()=>{
+        const buf=ac.createBuffer(1,ac.sampleRate*0.06,ac.sampleRate);
+        const data=buf.getChannelData(0);
+        for(let i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*0.4;
+        const src=ac.createBufferSource();
+        const bpf=ac.createBiquadFilter();
+        const g=ac.createGain();
+        bpf.type='bandpass'; bpf.frequency.value=2000+Math.random()*3000;
+        src.buffer=buf;
+        src.connect(bpf); bpf.connect(g); g.connect(ac.destination);
+        g.gain.setValueAtTime(0.18,ac.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.06);
+        src.start(ac.currentTime); src.stop(ac.currentTime+0.06);
+      }, b*55 + Math.random()*30);
+    }
+    // Final triumphant chord
+    setTimeout(()=>{
+      [523,659,784].forEach(f=>playTone(f,'sine',0.4,0.22));
+    }, 520);
+  } catch(e){}
 }
 function sfxCharge(pct){ if(Math.random()<0.15) playTone(200+pct*300,'sine',0.05,0.05); }
 function sfxBounce(){ playTone(200,'triangle',0.08,0.1,100); }
@@ -697,17 +730,22 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 // Dynamic resolution: fill available width keeping 9:5 aspect ratio
 function resizeCanvas() {
-  const wrap = document.getElementById('game-wrap');
-  const availW = wrap.clientWidth;
-  const availH = window.innerHeight;
-  // title+hud take ~80px total, leave room
-  const maxH = availH - 90;
+  // Measure all non-canvas elements
+  const titleEl  = document.getElementById('game-title');
+  const instrEl  = document.getElementById('instructions');
+  const titleH   = titleEl  ? titleEl.offsetHeight  + 8 : 36;
+  const instrH   = instrEl  ? instrEl.offsetHeight  + 6 : 20;
+  // HUD renders after canvas; estimate conservatively
+  const hudH     = 44;
+  const padding  = 8; // small buffer
+  const availH   = window.innerHeight - titleH - hudH - instrH - padding;
+  const availW   = document.getElementById('game-wrap').clientWidth;
+  // Fit 9:5 ratio within both dimensions
   let cw = availW;
   let ch = Math.round(cw * 500 / 900);
-  if (ch > maxH) { ch = maxH; cw = Math.round(ch * 900 / 500); }
-  canvas.width = cw;
+  if (ch > availH) { ch = Math.max(availH, 80); cw = Math.round(ch * 900 / 500); }
+  canvas.width  = cw;
   canvas.height = ch;
-  // Reposition cannon and group
   cannonBase.x = Math.round(cw * 0.08);
   cannonBase.y = Math.round(ch - ch * 0.16);
 }
@@ -820,9 +858,10 @@ function updateAngle(mx,my) {
   angle=Math.min(angle,-0.04);
 }
 canvas.addEventListener('mousemove',e=>{
-  if(hitPopupPending)return;
+  if(hitPopupPending||gameOver)return;
   const r=canvas.getBoundingClientRect(),sc=canvas.width/r.width;
   updateAngle((e.clientX-r.left)*sc,(e.clientY-r.top)*sc);
+  updateHUD(); // keep angle display live even before charging
 });
 canvas.addEventListener('mousedown',e=>{
   if(e.button!==0||projectile||gameOver||ammoLeft<=0||hitPopupPending)return;
@@ -1219,8 +1258,12 @@ function closeHitPopup(){
 }
 function showHitPopup(wx,wy,pts,charIdx){
   hitPopupPending=true;
-  document.getElementById('hit-score-val').textContent='獲得 '+pts+'元';
-  document.getElementById('hit-player-name').textContent='🏆 ' + (playerName||'冒險者');
+  sfxCheer();
+  // Format: 🎊 恭喜 OOO 獲得 300元！
+  const name = playerName||'冒險者';
+  document.getElementById('hit-score-val').innerHTML =
+    '🎊 恭喜 <span style="color:#ffd700;font-size:1.7rem;font-weight:900;text-shadow:0 0 10px #ff8c00;">' + name + '</span><br>' +
+    '<span style="color:#fff;font-size:1.4rem;">獲得 <span style="color:#ffd700;font-size:1.8rem;">' + pts + '</span> 元！</span>';
   // Draw character in popup canvas
   const pc=document.getElementById('hit-char-canvas');
   const pcx=pc.getContext('2d');
