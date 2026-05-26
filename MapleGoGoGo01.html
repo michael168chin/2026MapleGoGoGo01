@@ -48,17 +48,19 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 /* ========= OVERLAYS COMMON ========= */
 .overlay{
   position:fixed;top:0;left:0;right:0;bottom:0;
-  background:rgba(0,0,0,0.75);display:none;z-index:100;
-  align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.82);display:none;z-index:100;
+  align-items:flex-start;justify-content:center;
+  overflow-y:auto;padding:16px 0;
 }
 .overlay.active{display:flex;}
 .panel{
   background:linear-gradient(160deg,#0d1f3c,#1a0808);
   border:3px solid var(--maple-yellow);border-radius:16px;
-  padding:28px 32px;color:#fff;max-width:560px;width:92%;
+  padding:20px 22px;color:#fff;max-width:520px;width:95%;
   box-shadow:0 0 60px rgba(192,57,43,0.5);
+  margin:auto;flex-shrink:0;
 }
-.panel h2{color:var(--maple-yellow);font-size:1.6rem;margin-bottom:14px;text-align:center;text-shadow:0 0 10px #e67e22;}
+.panel h2{color:var(--maple-yellow);font-size:1.4rem;margin-bottom:12px;text-align:center;text-shadow:0 0 10px #e67e22;}
 .panel-btn{
   padding:9px 26px;background:linear-gradient(135deg,var(--maple-orange),var(--maple-red));
   color:#fff;border:none;border-radius:8px;font-size:.95rem;font-weight:700;
@@ -69,17 +71,17 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 .panel-btn.secondary{background:linear-gradient(135deg,#2c3e50,#34495e);}
 
 /* ========= CHARACTER SELECT ========= */
-#char-select-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0;}
+#char-select-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0;}
 .char-card{
-  border:2.5px solid #444;border-radius:10px;padding:8px 4px 6px;
+  border:2.5px solid #444;border-radius:10px;padding:6px 3px 5px;
   cursor:pointer;text-align:center;transition:all .2s;
   background:rgba(255,255,255,0.04);
 }
 .char-card:hover{border-color:var(--maple-yellow);background:rgba(255,215,0,0.08);}
 .char-card.selected{border-color:var(--maple-yellow);background:rgba(255,215,0,0.15);
   box-shadow:0 0 12px rgba(255,215,0,0.4);}
-.char-card canvas{display:block;margin:0 auto 4px;}
-.char-card .char-name{font-size:.72rem;color:#ddd;font-weight:700;}
+.char-card canvas{display:block;margin:0 auto 3px;width:44px!important;height:52px!important;}
+.char-card .char-name{font-size:.68rem;color:#ddd;font-weight:700;}
 #player-name-input{
   width:100%;padding:8px 12px;background:rgba(255,255,255,0.08);
   border:2px solid #555;border-radius:8px;color:#fff;font-size:1rem;
@@ -103,18 +105,28 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 /* ========= HIT POPUP ========= */
 #hit-popup{
   position:absolute;z-index:50;display:none;
-  background:rgba(10,20,40,0.96);border:3px solid var(--maple-yellow);
-  border-radius:14px;padding:14px 20px;
-  box-shadow:0 0 30px rgba(255,215,0,0.4);
+  background:rgba(10,20,40,0.97);border:3px solid var(--maple-yellow);
+  border-radius:14px;padding:14px 20px 12px;
+  box-shadow:0 0 30px rgba(255,215,0,0.5);
   animation:popIn .3s ease-out;
-  pointer-events:none;
+  pointer-events:auto;
+  min-width:170px;
 }
 @keyframes popIn{from{transform:scale(0.5);opacity:0;}to{transform:scale(1);opacity:1;}}
-#hit-popup .hit-inner{display:flex;align-items:center;gap:16px;}
+#hit-popup .hit-inner{display:flex;align-items:center;gap:14px;margin-bottom:10px;}
 #hit-popup .hit-score{font-size:1.8rem;font-weight:900;color:var(--maple-yellow);
   text-shadow:0 0 12px #e67e22;}
 #hit-popup .hit-label{font-size:.78rem;color:#aaa;}
 #hit-popup .hit-pts-label{font-size:.75rem;color:#f1c40f;}
+#hit-popup-ok{
+  display:block;width:100%;padding:7px 0;
+  background:linear-gradient(135deg,var(--maple-orange),var(--maple-red));
+  color:#fff;border:none;border-radius:8px;
+  font-size:.9rem;font-weight:700;font-family:inherit;
+  cursor:pointer;letter-spacing:1px;
+  box-shadow:0 3px 10px rgba(192,57,43,0.4);transition:transform .1s;
+}
+#hit-popup-ok:hover{transform:scale(1.04);}
 
 /* ========= END OVERLAY ========= */
 #end-overlay .panel{text-align:center;}
@@ -178,6 +190,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
         <div class="hit-score" id="hit-score-val">+500</div>
       </div>
     </div>
+    <button id="hit-popup-ok" onclick="closeHitPopup()">✔ 確定</button>
   </div>
 </div>
 <div id="instructions">🖱 移動滑鼠調整角度 ｜ 按住左鍵蓄力，放開發射 ｜ 擊中楓谷角色獲得分數！</div>
@@ -387,9 +400,9 @@ function buildCharSelect() {
       selectedChar = i;
     };
     const c = document.createElement('canvas');
-    c.width = 54; c.height = 64;
+    c.width = 44; c.height = 52;
     const cx = c.getContext('2d');
-    drawCharSprite(cx, def, 22, 50, 1.1);
+    drawCharSprite(cx, def, 18, 42, 0.9);
     card.appendChild(c);
     const nm = document.createElement('div');
     nm.className = 'char-name';
@@ -859,8 +872,15 @@ function drawParticles(){
 }
 
 // ---- Hit popup ----
-let hitPopupTimer=null;
+let hitPopupPending=false;
+function closeHitPopup(){
+  document.getElementById('hit-popup').style.display='none';
+  hitPopupPending=false;
+  // Resume round-end check after player confirms
+  checkRoundEnd();
+}
 function showHitPopup(wx,wy,pts,charIdx){
+  hitPopupPending=true;
   const popup=document.getElementById('hit-popup');
   document.getElementById('hit-score-val').textContent='+'+pts;
   // Draw character in popup canvas
@@ -868,28 +888,27 @@ function showHitPopup(wx,wy,pts,charIdx){
   const pcx=pc.getContext('2d');
   pcx.clearRect(0,0,pc.width,pc.height);
   drawCharSprite(pcx, CHAR_DEFS[charIdx], pc.width/2, pc.height-8, 1.3);
-  // Position popup near hit point
+  // Position popup near hit point, centred if near edge
   const gw=document.getElementById('game-wrap');
   const rect=canvas.getBoundingClientRect();
   const wRect=gw.getBoundingClientRect();
   const sc=rect.width/W;
-  let px=(wx*sc)+(rect.left-wRect.left)-50;
-  let py=(wy*sc)+(rect.top-wRect.top)-90;
-  px=Math.max(4,Math.min(px,rect.width-140));
-  py=Math.max(4,Math.min(py,rect.height-100));
+  let px=(wx*sc)+(rect.left-wRect.left)-85;
+  let py=(wy*sc)+(rect.top-wRect.top)-110;
+  px=Math.max(6,Math.min(px,rect.width-190));
+  py=Math.max(6,Math.min(py,rect.height-130));
   popup.style.left=px+'px';
   popup.style.top=py+'px';
   popup.style.display='block';
   popup.style.animation='none';
   void popup.offsetWidth;
   popup.style.animation='popIn .3s ease-out';
-  if(hitPopupTimer)clearTimeout(hitPopupTimer);
-  hitPopupTimer=setTimeout(()=>{popup.style.display='none';},1600);
 }
 
 // ---- Round / End ----
 function checkRoundEnd(){
   if(projectile)return;
+  if(hitPopupPending)return; // wait for player to confirm hit popup
   const allHit=targets.every(t=>t.hit);
   if(allHit||ammoLeft<=0){
     setTimeout(()=>{
