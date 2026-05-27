@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v4.3
+     版本：v4.4
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -33,38 +33,7 @@ body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;ju
 }
 /* gear and reset positioned over canvas — see responsive block below */
 
-/* ========= ANGLE SLIDER (mobile) ========= */
-#angle-slider-wrap{
-  position:absolute;
-  right:52px; top:5%; bottom:10%;
-  width:44px;
-  display:flex;flex-direction:column;align-items:center;
-  z-index:15;
-  background:rgba(10,20,40,0.55);
-  border:1.5px solid rgba(255,215,0,0.4);
-  border-radius:22px;
-  padding:6px 0;
-  user-select:none;
-  touch-action:none;
-}
-#angle-slider-label,#angle-slider-val{
-  color:#f1c40f;font-size:clamp(.55rem,1.2vw,.72rem);font-weight:700;
-  text-align:center;line-height:1.2;
-}
-#angle-slider-track{
-  flex:1;width:10px;background:rgba(255,255,255,0.12);
-  border-radius:5px;margin:6px 0;position:relative;cursor:pointer;
-}
-#angle-slider-thumb{
-  position:absolute;left:50%;transform:translateX(-50%);
-  width:28px;height:28px;border-radius:50%;
-  background:radial-gradient(circle at 35% 35%,#ffd700,#e67e22);
-  border:2px solid #fff8;
-  box-shadow:0 2px 8px rgba(0,0,0,0.5);
-  cursor:grab;top:50%;margin-top:-14px;
-  transition:box-shadow .1s;
-}
-#angle-slider-thumb:active{cursor:grabbing;box-shadow:0 0 12px #ffd70088;}
+/* angle slider CSS removed */
 
 /* ========= CANVAS WRAP ========= */
 #game-wrap{position:relative;width:100%;margin:0 auto;display:block;flex-shrink:0;}
@@ -258,14 +227,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 
 <div id="game-wrap">
   <canvas id="gameCanvas" width="900" height="500"></canvas>
-  <!-- Mobile angle slider: right side -->
-  <div id="angle-slider-wrap">
-    <div id="angle-slider-label">角度</div>
-    <div id="angle-slider-track">
-      <div id="angle-slider-thumb"></div>
-    </div>
-    <div id="angle-slider-val">45°</div>
-  </div>
+  <!-- angle slider removed -->
   <button id="reset-btn" onclick="openResetConfirm()" title="重新開始">重新開始</button>
   <svg id="gear-btn" viewBox="0 0 24 24" onclick="openSettings()" title="設定">
     <path fill="#f1c40f" d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.34.07-.69.07-1.08s-.03-.74-.07-1.08l2.32-1.81c.21-.16.27-.45.14-.69l-2.2-3.81c-.13-.24-.42-.32-.66-.24l-2.73 1.1c-.57-.44-1.17-.81-1.85-1.08L14 2.42c-.04-.26-.27-.42-.54-.42h-2.92c-.27 0-.5.16-.54.42l-.41 2.97c-.68.27-1.28.64-1.85 1.08L5 5.37c-.24-.08-.53 0-.66.24L2.14 9.42c-.13.24-.07.53.14.69l2.32 1.81C4.56 12.26 4.5 12.63 4.5 13s.06.74.1 1.08L2.28 15.89c-.21.16-.27.45-.14.69l2.2 3.81c.13.24.42.32.66.24l2.73-1.1c.57.44 1.17.81 1.85 1.08l.41 2.97c.04.26.27.42.54.42h2.92c.27 0 .5-.16.54-.42l.41-2.97c.68-.27 1.28-.64 1.85-1.08l2.73 1.1c.24.08.53 0 .66-.24l2.2-3.81c.13-.24.07-.53-.14-.69l-2.32-1.81z"/>
@@ -380,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.3</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.4</div>
     </div>
   </div>
 </div>
@@ -439,9 +401,9 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">🐟 魚群設定</div>
     <div class="setting-row">
       <label>魚群游速</label>
-      <input type="range" id="set-fish-spd" min="0.2" max="3.0" step="0.1" value="1.0"
+      <input type="range" id="set-fish-spd" min="0.2" max="3.0" step="0.1" value="0.6"
         oninput="document.getElementById('set-fish-spd-val').textContent=parseFloat(this.value).toFixed(1)">
-      <span class="setting-val" id="set-fish-spd-val">1.0</span>
+      <span class="setting-val" id="set-fish-spd-val">0.6</span>
     </div>
     <div class="setting-row">
       <label>魚群數量</label>
@@ -601,7 +563,7 @@ const cfg = {
   ammoPerRound: 10,
   totalRounds: 3,
   skyTexts: ['實動抽', '達標抽', '報聘抽2次', '排名抽', '', ''],  // 6 groups
-  fishSpeed: 1.0,  // multiplier, base is already slow
+  fishSpeed: 0.6,  // default speed
   fishCount: 12,
 };
 
@@ -1061,7 +1023,7 @@ function createFish(startRight){
     jumpVy: 0, jumpX: 0, jumpY: 0,
     splashed: false,
     // 10~20 seconds at ~60fps = 600~1200 frames
-    jumpTimer: 600+Math.random()*600,
+    jumpTimer: 600+Math.random()*300,  // 10-15s at 60fps
   };
 }
 function updateFish(dt){
@@ -1084,7 +1046,7 @@ function updateFish(dt){
       if(f.jumpY>canvas.height*0.05){
         f.jumping=false; f.splashed=false;
         f.jumpX=0; f.jumpY=0;
-        f.jumpTimer=600+Math.random()*600; // 10~20s
+        f.jumpTimer=600+Math.random()*300; // 10-15s
       }
     } else {
       const spd=(cfg.fishSpeed||1.0);
@@ -1100,7 +1062,7 @@ function updateFish(dt){
       if(f.jumpTimer<=0){
         f.jumping=true; f.splashed=false;
         f.jumpVy=-(6+Math.random()*4);
-        f.jumpTimer=600+Math.random()*600;
+        f.jumpTimer=600+Math.random()*300;
       }
     }
   });
@@ -1264,7 +1226,7 @@ canvas.addEventListener('mousemove',e=>{
   if(hitPopupPending||gameOver)return;
   const r=canvas.getBoundingClientRect(),sc=canvas.width/r.width;
   updateAngle((e.clientX-r.left)*sc,(e.clientY-r.top)*sc);
-  if(Math.abs(angle-_prevAngle)>0.02){sfxAngleTick();_prevAngle=angle;if(window._syncAngleSlider)_syncAngleSlider();}
+  if(Math.abs(angle-_prevAngle)>0.02){sfxAngleTick();_prevAngle=angle;}
   updateHUD();
 });
 canvas.addEventListener('mousedown',e=>{
@@ -1275,52 +1237,70 @@ canvas.addEventListener('mouseup',e=>{
   if(e.button!==0||!charging||projectile||ammoLeft<=0||hitPopupPending)return;
   charging=false; fire();
 });
-// Canvas touch: drag to adjust angle; hold still 3s to charge+fire
-let _touchHoldTimer=null, _touchCharging=false, _touchHoldStart=0;
+// ---- TOUCH CONTROLS ----
+// Drag = adjust angle by relative vertical movement
+// Hold still 2s = start charging; release = fire
+let _touchHoldTimer=null, _touchCharging=false;
+let _touchLastY=0, _touchStartY=0, _touchMoved=false;
+const TOUCH_ANGLE_SENS = 0.008; // radians per pixel of drag
+
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
-  if(hitPopupPending||gameOver||ammoLeft<=0||projectile) return;
-  const r=canvas.getBoundingClientRect(),sc=canvas.width/r.width,t=e.touches[0];
-  updateAngle((t.clientX-r.left)*sc,(t.clientY-r.top)*sc);
-  updateHUD();
-  if(window._syncAngleSlider) _syncAngleSlider();
-  // Start hold timer
-  _touchHoldStart=performance.now();
-  _touchCharging=false;
+  if(hitPopupPending||gameOver) return;
+  const t=e.touches[0];
+  _touchLastY = t.clientY;
+  _touchStartY = t.clientY;
+  _touchMoved = false;
+  _touchCharging = false;
   if(_touchHoldTimer) clearTimeout(_touchHoldTimer);
-  _touchHoldTimer=setTimeout(()=>{
-    if(!hitPopupPending&&!gameOver&&ammoLeft>0&&!projectile){
-      _touchCharging=true;
-      charging=true;
-      chargeStart=performance.now();
-    }
-  },3000);
+  // Start 2-second hold timer
+  if(ammoLeft>0 && !projectile){
+    _touchHoldTimer = setTimeout(()=>{
+      if(!hitPopupPending && !gameOver && ammoLeft>0 && !projectile && !_touchMoved){
+        _touchCharging = true;
+        charging = true;
+        chargeStart = performance.now();
+      }
+    }, 2000);
+  }
 },{passive:false});
+
 canvas.addEventListener('touchmove',e=>{
   e.preventDefault();
   if(hitPopupPending||gameOver) return;
-  const r=canvas.getBoundingClientRect(),sc=canvas.width/r.width,t=e.touches[0];
-  updateAngle((t.clientX-r.left)*sc,(t.clientY-r.top)*sc);
-  updateHUD();
-  if(window._syncAngleSlider) _syncAngleSlider();
-  if(Math.abs(angle-_prevAngle)>0.02){sfxAngleTick();_prevAngle=angle;}
-  // Reset hold timer on movement (must be still for 3s)
+  const t=e.touches[0];
+  const dy = t.clientY - _touchLastY;
+  _touchLastY = t.clientY;
+  // If moved more than 8px from start, consider it a drag (not a hold)
+  if(Math.abs(t.clientY - _touchStartY) > 8){
+    _touchMoved = true;
+    // Cancel hold timer on significant movement
+    if(_touchHoldTimer && !_touchCharging){
+      clearTimeout(_touchHoldTimer); _touchHoldTimer=null;
+      // Restart timer from new still position
+      _touchHoldTimer = setTimeout(()=>{
+        if(!hitPopupPending&&!gameOver&&ammoLeft>0&&!projectile&&!_touchMoved){
+          _touchCharging=true; charging=true; chargeStart=performance.now();
+        }
+      }, 2000);
+      _touchMoved = false;
+    }
+  }
   if(!_touchCharging){
-    _touchHoldStart=performance.now();
-    if(_touchHoldTimer){clearTimeout(_touchHoldTimer);_touchHoldTimer=null;}
-    _touchHoldTimer=setTimeout(()=>{
-      if(!hitPopupPending&&!gameOver&&ammoLeft>0&&!projectile){
-        _touchCharging=true; charging=true; chargeStart=performance.now();
-      }
-    },3000);
+    // Drag up → angle goes up (more negative), drag down → angle goes down
+    const AMAX=-Math.PI/2, AMIN=Math.PI/12;
+    angle = Math.max(AMAX, Math.min(AMIN, angle + dy * TOUCH_ANGLE_SENS));
+    if(Math.abs(dy)>1){ sfxAngleTick(); _prevAngle=angle; }
+    updateHUD();
   }
 },{passive:false});
+
 canvas.addEventListener('touchend',e=>{
   e.preventDefault();
   if(_touchHoldTimer){clearTimeout(_touchHoldTimer);_touchHoldTimer=null;}
   if(_touchCharging){
     _touchCharging=false; charging=false;
-    if(!projectile&&ammoLeft>0&&!hitPopupPending) fire();
+    if(!projectile && ammoLeft>0 && !hitPopupPending) fire();
   } else {
     charging=false;
   }
@@ -1613,8 +1593,10 @@ function drawBackground(){
     if(!txt) return;
     // Each text drifts slowly, different phase
     const phase=i*1.8;
-    const tx=cw*(0.08+i*0.14) + Math.sin(now*0.18+phase)*cw*0.025;
-    const ty=ch*(0.08+Math.sin(now*0.12+phase*0.7)*0.04) + i%2*ch*0.05;
+    // Spread texts evenly: positions at ~15%, 35%, 58%, 78%, 88%, 95% of width
+    const xPositions=[0.14, 0.34, 0.56, 0.76, 0.88, 0.95];
+    const tx=cw*(xPositions[i]||0.1+i*0.15) + Math.sin(now*0.18+phase)*cw*0.022;
+    const ty=ch*(0.07+Math.sin(now*0.12+phase*0.7)*0.035) + (i%2)*ch*0.055;
     const alpha=0.45+Math.sin(now*0.4+phase)*0.08; // fixed alpha visible in both browsers
     const fs=Math.round(cw*0.022);
     ctx.save();
@@ -1670,7 +1652,7 @@ function drawCastle(){
   // Scale factor — castle occupies left ~18% of canvas
   const S = cw * 0.00155; // base scale unit — reduced height
   const bx = cw * 0.005; // base left anchor
-  const by = ch * 0.60;  // ground line
+  const by = ch * 0.64;  // ground line (lowered so castle top is visible)
 
   ctx.save();
 
@@ -2241,142 +2223,7 @@ function gameLoop(ts){
   }
 }
 
-// ---- ANGLE SLIDER (touch/mobile) ----
-(function(){
-  const track = document.getElementById('angle-slider-track');
-  const thumb = document.getElementById('angle-slider-thumb');
-  const valLbl = document.getElementById('angle-slider-val');
-  if(!track) return;
-
-  // Slider: TOP = 90° (straight up) = -PI/2; BOTTOM = -15° (slightly down) = +PI/12
-  const ANGLE_MIN = -Math.PI / 2;   // slider top = 90° up
-  const ANGLE_MAX = Math.PI / 12;   // slider bottom = -15° (15° below horizontal)
-
-  let dragging = false;
-  let sliderY = 0.5; // 0=top(low angle) 1=bottom(high angle)
-  let holdTimer = null;
-  let holdStart = 0;
-  let sliderCharging = false;
-  let sliderHoldActive = false;
-
-  function setThumbPos(frac){
-    const trackH = track.clientHeight - 28;
-    thumb.style.top = (frac * trackH + 14) + 'px';
-    thumb.style.marginTop = '0';
-  }
-
-  function fracToAngle(frac){
-    // frac 0=top → shallow angle; frac 1=bottom → steep angle
-    return ANGLE_MIN + (ANGLE_MAX - ANGLE_MIN) * frac;
-  }
-
-  function updateFromFrac(frac){
-    sliderY = Math.max(0, Math.min(1, frac));
-    setThumbPos(sliderY);
-    if(!hitPopupPending && !gameOver){
-      angle = fracToAngle(sliderY);
-      updateHUD();
-      sfxAngleTick();
-    }
-  }
-
-  // Init thumb position at 45°
-  function syncThumbFromAngle(){
-    const frac = (angle - ANGLE_MIN) / (ANGLE_MAX - ANGLE_MIN);
-    sliderY = Math.max(0, Math.min(1, frac));
-    setThumbPos(sliderY);
-    const deg = Math.round((-angle)*180/Math.PI);
-    valLbl.textContent = deg + '°';
-  }
-
-  function getTrackFrac(clientY){
-    const rect = track.getBoundingClientRect();
-    return (clientY - rect.top) / rect.height;
-  }
-
-  function startDrag(clientY){
-    if(hitPopupPending || gameOver || projectile) return;
-    dragging = true;
-    updateFromFrac(getTrackFrac(clientY));
-  }
-
-  function moveDrag(clientY){
-    if(!dragging) return;
-    updateFromFrac(getTrackFrac(clientY));
-  }
-
-  function endDrag(){
-    if(!dragging) return;
-    dragging = false;
-  }
-
-  // Hold to charge: pointer down on slider for >0.5s = charge, release = fire
-  track.addEventListener('pointerdown', e=>{
-    e.preventDefault();
-    track.setPointerCapture(e.pointerId);
-    startDrag(e.clientY);
-    if(ammoLeft<=0 || gameOver || hitPopupPending || projectile) return;
-    holdStart = performance.now();
-    sliderHoldActive = true;
-    sliderCharging = false;
-    holdTimer = setTimeout(()=>{
-      if(sliderHoldActive && !projectile && ammoLeft>0 && !hitPopupPending){
-        sliderCharging = true;
-        charging = true;
-        chargeStart = performance.now();
-      }
-    }, 3000); // 3 seconds hold before charging
-  });
-
-  track.addEventListener('pointermove', e=>{
-    e.preventDefault();
-    if(!sliderHoldActive) return;
-    if(!sliderCharging){
-      // Still adjusting angle — reset hold timer on movement
-      moveDrag(e.clientY);
-      if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; }
-      // Restart 3s timer from last still position
-      holdStart = performance.now();
-      holdTimer = setTimeout(()=>{
-        if(sliderHoldActive && !projectile && ammoLeft>0 && !hitPopupPending){
-          sliderCharging = true;
-          charging = true;
-          chargeStart = performance.now();
-        }
-      }, 3000);
-    }
-  });
-
-  track.addEventListener('pointerup', e=>{
-    e.preventDefault();
-    if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; }
-    moveDrag(e.clientY);
-    endDrag();
-    if(sliderHoldActive){
-      const held = performance.now() - holdStart;
-      sliderHoldActive = false;
-      if(sliderCharging){
-        // Fire!
-        sliderCharging = false;
-        charging = false;
-        if(!projectile && ammoLeft>0 && !hitPopupPending) fire();
-      }
-      // < 0.5s = no fire (already cancelled by holdTimer)
-    }
-    sliderCharging = false;
-    charging = false;
-  });
-
-  track.addEventListener('pointercancel', e=>{
-    if(holdTimer){clearTimeout(holdTimer);holdTimer=null;}
-    dragging=false; sliderHoldActive=false; sliderCharging=false; charging=false;
-  });
-
-  // Sync after resize
-  window.addEventListener('resize', ()=>setTimeout(syncThumbFromAngle,50));
-  // Expose sync for main code
-  window._syncAngleSlider = syncThumbFromAngle;
-})();
+// Angle slider IIFE removed
 
 // ---- Init ----
 function initGame(){
@@ -2416,7 +2263,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v4.3
+     A321 前進楓之國  v4.4
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
