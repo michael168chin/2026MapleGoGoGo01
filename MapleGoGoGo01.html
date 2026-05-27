@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v5.4
+     版本：v5.5
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.4</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.5</div>
     </div>
   </div>
 </div>
@@ -1631,22 +1631,23 @@ canvas.addEventListener('touchend',e=>{
 function fire() {
   const minSpd=8, maxSpd=24;
   const spd = minSpd + power*(maxSpd-minSpd);
-  const pitch = angle; // negative = upward
-  // 3D velocity: yaw rotates the XZ plane
-  // pitch controls Y and the horizontal magnitude
-  const hSpd = Math.cos(pitch) * spd;  // horizontal speed magnitude
-  const vx3 = hSpd * Math.cos(yaw);    // X component (yaw=0 → pure right)
-  const vy3 = Math.sin(pitch) * spd;   // Y component (negative = up)
-  const vz3 = hSpd * Math.sin(yaw);    // Z component (yaw>0 → right = away)
-  // Start projectile at cannon tip (world coords)
-  const wTipX = cannonBase.x + Math.cos(pitch)*Math.cos(yaw)*46;
-  const wTipY = cannonBase.y + Math.sin(pitch)*46;
+  // 2D physics (world X = screen X)
+  const tipX = cannonBase.x + Math.cos(angle)*46;
+  const tipY = cannonBase.y + Math.sin(angle)*46;
+  // Z encodes yaw direction: yaw>0 = deeper into scene
+  const vz3 = Math.abs(Math.sin(yaw)) * spd * 0.3; // Z speed from yaw magnitude
+  // yaw shifts the effective target: store yaw offset so collision uses it
+  const {dx:yOx, dy:yOy} = yawLandingOffset();
   projectile = {
-    x:wTipX, y:wTipY,
+    x:tipX, y:tipY,
     z: 0.2,
-    vx:vx3, vy:vy3, vz:vz3, r:8
+    vx: Math.cos(angle)*spd,
+    vy: Math.sin(angle)*spd,
+    vz: vz3,
+    r:8,
+    yawOx: yOx,  // yaw landing offset X (applied to hit detection)
+    yawOy: yOy,  // yaw landing offset Y
   };
-  const {sx:tipX, sy:tipY}=proj3D(wTipX,wTipY,0.2);
   stopWhistle();
   _projWasAbove=false; _projWasInWater=false; trail=[];
   ammoLeft--; power=0.5;
@@ -2388,46 +2389,41 @@ function drawTargets(){
   });
 }
 
-// ---- 3D → screen projection (true scene perspective) ----
-//
-// Scene layout:
-//   horizonY = ch * 0.44  (vanishing point / sky-ground boundary)
-//   nearGroundY = ch * 0.60  (left ground, Z=0)
-//   farGroundY  = ch * 0.58  (right ground, Z≈9, slightly above nearGround due to perspective)
-//   farGroundX  = cw * 0.85  (centre of right bank)
-//
-// Mapping:
-//   Z=0 (cannon area): screen Y = nearGroundY
-//   Z=Z_TARGETS (right bank): screen Y = farGroundY
-//   Intermediate Z: linear interpolation toward horizon
-//   World Y (height above ground plane) scales with depth
-//
+// ---- 3D → screen projection ----
+// The game is fundamentally 2D (world X = screen X, world Y = screen Y)
+// Z is used only for:
+//   1. Scaling the projectile sprite (further = smaller)
+//   2. Computing the yaw-based visual offset (see yawOffset below)
+// proj3D simply applies scale for sprite sizing + yaw visual offset
 function proj3D(wx, wy, wz){
-  const cw=canvas.width, ch=canvas.height;
-  const horizonY   = ch * 0.44;
-  const nearGroundY= ch * 0.60;
-  const farGroundY = ch * 0.58;
-  const tZ = Math.max(0, Math.min(1, wz / Z_TARGETS)); // 0=near, 1=far
-  
-  // Ground Y at this depth (perspective convergence toward horizon)
-  const groundAtZ = nearGroundY + (farGroundY - nearGroundY) * tZ
-                  + (horizonY - nearGroundY) * tZ * tZ * 0.35;
-
-  // Height above ground (world Y is negative=up, so wy < groundAtZ means above ground)
-  // At far depth, height appears compressed
-  const heightScale = 1.0 - tZ * 0.55;
-  const sy = groundAtZ + (wy - nearGroundY) * heightScale;
-
-  // X: perspective compress horizontally toward a lateral vanishing point
-  // Near (Z=0): X is literal canvas X
-  // Far (Z=Z_TARGETS): X converges slightly toward canvas centre
-  const xCompress = 1.0 - tZ * 0.18;
+  const tZ = Math.max(0, Math.min(1, wz / Z_TARGETS));
+  const scale = Math.max(0.35, 1.0 - tZ * 0.5);
+  // X: slight perspective compression as depth increases
+  const cw=canvas.width;
+  const xCompress = 1.0 - tZ * 0.12;
   const midX = cw * 0.5;
   const sx = midX + (wx - midX) * xCompress;
-
-  // Scale factor (for drawing size of projectile)
-  const scale = Math.max(0.25, 1.0 - tZ * 0.55);
+  // Y: slight lift toward horizon as depth increases
+  const ch=canvas.height;
+  const horizonY = ch * 0.44;
+  const sy = wy + (horizonY - wy) * tZ * 0.25;
   return {sx, sy, scale};
+}
+
+// ---- Yaw → screen landing offset on right-bank arc ----
+// The yellow circles in the reference image trace a diagonal arc on the right bank
+// Arc direction: upper-left (yaw=-30°) to lower-right (yaw=+30°)
+// Arc slope: ~1:1 (dY ≈ dX) on screen
+// This function returns the {dx,dy} screen offset to apply to the aim landing point
+function yawLandingOffset(){
+  const cw=canvas.width, ch=canvas.height;
+  // Arc spans: from zone left-top (yaw=-30°) to zone right-bottom (yaw=+30°)
+  // Total arc X = getZoneW() * 0.7, arc Y = same (slope ~1)
+  const arcRadius = getZoneW() * 0.65; // total arc half-span in X
+  const t = yaw / YAW_MAX;  // -1 to +1
+  const dx = arcRadius * t;
+  const dy = arcRadius * t * 1.02;  // ~45° diagonal (slope 1:1)
+  return {dx, dy};
 }
 
 // ---- Projectile ----
@@ -2436,17 +2432,18 @@ let _projWasInWater=false; // track water entry
 function updateProjectile(dt){
   if(!projectile)return;
 
-  // 3D physics step
-  projectile.vy += 9.8*dt;   // gravity on Y
+  // Physics (2D parabola, Z grows for visual scaling only)
+  projectile.vy += 9.8*dt;
   projectile.x  += projectile.vx;
   projectile.y  += projectile.vy;
-  projectile.z  = (projectile.z||0) + projectile.vz;
+  projectile.z   = (projectile.z||0) + (projectile.vz||0)*dt*60;
+  if(projectile.z<0) projectile.z=0;
 
-  // Clamp Z so projectile doesn't go behind viewer
-  if(projectile.z < 0) projectile.z = 0;
-
-  // Project to screen for trail
-  const {sx, sy, scale} = proj3D(projectile.x, projectile.y, projectile.z);
+  // Apply yaw offset to get visual/effective position
+  const _zFr = Math.min(1,(projectile.z||0)/Z_TARGETS);
+  const vsx = projectile.x + (projectile.yawOx||0)*_zFr;
+  const vsy = projectile.y + (projectile.yawOy||0)*_zFr;
+  const {sx, sy, scale} = proj3D(vsx, vsy, projectile.z);
   trail.push({x:sx, y:sy, s:scale});
   if(trail.length>28)trail.shift();
 
@@ -2454,24 +2451,24 @@ function updateProjectile(dt){
   if(sy < 0){ _projWasAbove=true; }
   if(_projWasAbove && projectile.vy>0){ updateWhistle(projectile.vy); }
 
-  // ---- Target hit check ----
-  // Targets sit at Z≈9 (right bank). Only valid hit if projectile Z is close.
-  if(projectile.vy > -2){ // not strongly ascending
+  // ---- Target hit check with yaw offset ----
+  if(projectile.vy > -2){
+    // Apply yaw offset based on how far the projectile has traveled into the scene
+    const zFrac = Math.min(1, (projectile.z||0) / Z_TARGETS);
+    const effX = projectile.x + (projectile.yawOx||0)*zFrac;
+    const effY = projectile.y + (projectile.yawOy||0)*zFrac;
     for(const t of targets){
       if(t.hit) continue;
       const tx=getGroupCX()+t.ox, ty=getGroupCY()+t.oy;
-      const tZ = Z_TARGETS; // targets at far Z
-      // 3D distance
-      const dx=projectile.x-tx, dy=projectile.y-ty, dz=projectile.z-tZ;
-      const dist3D=Math.sqrt(dx*dx+dy*dy+dz*dz*0.6);
-      if(dist3D < t.r+projectile.r){
+      const dx=effX-tx, dy=effY-ty;
+      const dist2D=Math.sqrt(dx*dx+dy*dy);
+      if(dist2D < t.r+projectile.r){
         t.hit=true; hitPopupPending=true;
         score+=t.pts;
-        const {sx:hsx,sy:hsy}=proj3D(tx,ty,tZ);
-        spawnHit(hsx,hsy,tierColor(t.pts));
+        spawnHit(tx, ty, tierColor(t.pts));
         stopWhistle(); sfxHit(t.pts); updateHUD();
         projectile=null; trail=[];
-        const _hpx=hsx,_hpy=hsy,_hpts=t.pts,_hci=t.charIdx;
+        const _hpx=tx,_hpy=ty,_hpts=t.pts,_hci=t.charIdx;
         setTimeout(()=>{ showHitPopup(_hpx,_hpy,_hpts,_hci); },1500);
         checkRoundEnd();
         return;
@@ -2480,7 +2477,10 @@ function updateProjectile(dt){
   }
 
   // ---- Water surface entry detection ----
-  const {sx:psx, sy:psy, scale:pscale} = proj3D(projectile.x, projectile.y, projectile.z);
+  const _zwf=Math.min(1,(projectile.z||0)/Z_TARGETS);
+  const _pwx=projectile.x+(projectile.yawOx||0)*_zwf;
+  const _pwy=projectile.y+(projectile.yawOy||0)*_zwf;
+  const {sx:psx, sy:psy, scale:pscale} = proj3D(_pwx,_pwy,projectile.z);
   const waterSurfaceY = canvas.height * 0.595;
   const pZ3 = projectile.z;
   // Lake Z range: 2~6 (lake exists in middle depth)
@@ -2532,8 +2532,11 @@ function drawProjectile(){
     ctx.beginPath();ctx.arc(trail[i].x,trail[i].y,r,0,Math.PI*2);ctx.fill();ctx.restore();
   }
   if(!projectile)return;
-  // Project current projectile position to screen
-  const {sx,sy,scale} = proj3D(projectile.x, projectile.y, projectile.z);
+  // Use visual position (with yaw offset applied)
+  const _zFr2=Math.min(1,(projectile.z||0)/Z_TARGETS);
+  const _vsx=projectile.x+(projectile.yawOx||0)*_zFr2;
+  const _vsy=projectile.y+(projectile.yawOy||0)*_zFr2;
+  const {sx,sy,scale} = proj3D(_vsx,_vsy,projectile.z);
   const sr = projectile.r * scale;
   const pg=ctx.createRadialGradient(sx-2*scale,sy-2*scale,1,sx,sy,Math.max(1,sr));
   pg.addColorStop(0,'#fff');pg.addColorStop(0.4,'#ffd700');pg.addColorStop(1,'#c8860a');
@@ -2549,32 +2552,38 @@ function drawAimLine(){
   const minSpd=8, maxSpd=24;
   const spd = minSpd + power*(maxSpd-minSpd);
   const dt = 1/60;
-  const pitch = angle;
-  const hSpd = Math.cos(pitch)*spd;
-  // 3D velocity: yaw rotates the aim direction
-  const avx = hSpd*Math.cos(yaw);   // world X velocity
-  const avy = Math.sin(pitch)*spd;  // world Y velocity (negative=up)
-  const avz = hSpd*Math.sin(yaw);   // world Z velocity (into scene)
-  // Start at cannon tip world position
-  let ax=cannonBase.x + Math.cos(pitch)*Math.cos(yaw)*40;
-  let ay=cannonBase.y + Math.sin(pitch)*40;
-  let az=0.15;
-  let vx=avx, vy=avy, vz=avz;
+  // Pure 2D parabola (same as actual projectile)
+  let ax = cannonBase.x + Math.cos(angle)*46;
+  let ay = cannonBase.y + Math.sin(angle)*46;
+  let vx = Math.cos(angle)*spd;
+  let vy = Math.sin(angle)*spd;
+  let az = 0.2;
+  const vz3 = Math.abs(Math.sin(yaw))*spd*0.3;
+  // Yaw landing offset — applied progressively along trajectory
+  const {dx:yOx, dy:yOy} = yawLandingOffset();
   const pts=[];
   const waterSY = canvas.height*0.595;
-  for(let i=0;i<700;i++){
-    vy+=9.8*dt; ax+=vx; ay+=vy; az+=vz;
+  const cw=canvas.width;
+  for(let i=0;i<600;i++){
+    vy += 9.8*dt; ax+=vx; ay+=vy; az+=vz3*dt*60;
     if(az<0) az=0;
-    const {sx,sy,scale}=proj3D(ax,ay,az);
-    // Stop if way off screen or past target Z
-    if(sx>canvas.width+200||sy>canvas.height+50||az>Z_TARGETS+5) break;
+    // Apply yaw offset progressively: lerp from 0 at start to full offset at end
+    // Use Z progress as the interpolation factor
+    const zFrac = Math.min(1, az / Z_TARGETS);
+    const pax = ax + yOx * zFrac;
+    const pay = ay + yOy * zFrac;
+    const {sx,sy,scale}=proj3D(pax,pay,az);
+    if(sx>cw+180||sy>canvas.height+50) break;
     if(sx<-100) break;
-    pts.push({sx,sy,scale,ax,ay,az});
-    // Water surface stop: projected Y at water level AND in lake X range AND correct Z depth
-    if(vy>0 && sy>=waterSY && sy<waterSY+Math.abs(vy)*1.5+5
-       && sx>canvas.width*0.20 && sx<canvas.width*0.73
+    pts.push({sx,sy,scale});
+    // Stop at water surface
+    const inLakeX = sx>cw*0.20 && sx<cw*0.73;
+    if(vy>0 && inLakeX && sy>=waterSY && sy<waterSY+Math.abs(vy)*2+6
        && az>Z_LAKE_MIN && az<Z_LAKE_MAX+1) break;
-    if(sy>canvas.height*0.96 && i>80) break;
+    // Stop at right bank ground level
+    const atRightBank = sx>cw*0.70;
+    if(atRightBank && vy>0 && ay>=canvas.height*0.58 && i>40) break;
+    if(sy>canvas.height*0.97 && i>80) break;
   }
   if(pts.length<2) return;
   ctx.save();
@@ -2802,7 +2811,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v5.4
+     A321 前進楓之國  v5.5
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
