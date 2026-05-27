@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v3.8
+     版本：v3.9
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -377,7 +377,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v3.8</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v3.9</div>
     </div>
   </div>
 </div>
@@ -833,10 +833,17 @@ function confirmChar() {
   const ovEl = document.getElementById('char-overlay');
   if(ovEl) ovEl.classList.remove('active');
 
-  // Background: write to Google Sheets with timeout
+  // Background: check dedup then write to Google Sheets
   setTimeout(function(){
     try {
-      gsRegisterPlayer(playerName, myCharDef ? myCharDef.name : '戰士').catch(function(){});
+      const charName = myCharDef ? myCharDef.name : '戰士';
+      // Check existing players in dropdown for dedup (no extra fetch needed)
+      const sel = document.getElementById('existing-players-select');
+      const existingPlayers = (sel && sel._players) ? sel._players : [];
+      const isDup = existingPlayers.some(p => p.name === playerName && p.character === charName);
+      if(!isDup){
+        gsRegisterPlayer(playerName, charName).catch(function(){});
+      }
     } catch(e){}
   }, 200);
 }
@@ -1931,7 +1938,8 @@ function drawCannon(){
     power=Math.min(elapsed/4.0,1.0);
     const glow=Math.sin(elapsed*8)*0.3+0.7;
     ctx.save();ctx.globalAlpha=power*glow*0.6;
-    const cg=ctx.createRadialGradient(x,y,0,x,y,48*sc*power);
+    const cgR=Math.max(1,48*sc*power);
+    const cg=ctx.createRadialGradient(x,y,0,x,y,cgR);
     cg.addColorStop(0,'#ff8800');cg.addColorStop(0.5,'#ff4400');cg.addColorStop(1,'transparent');
     ctx.fillStyle=cg;ctx.beginPath();ctx.arc(x,y,48*sc*power,0,Math.PI*2);ctx.fill();
     ctx.restore();
@@ -2181,6 +2189,7 @@ function addScorePopup(x,y,pts,color){
 // ---- Main loop ----
 let lastTime=0;
 function gameLoop(ts){
+  try {
   const dt=Math.min((ts-lastTime)/1000,0.05);lastTime=ts;
   ctx.clearRect(0,0,canvas.width,canvas.height);
   // Cloud drift
@@ -2208,6 +2217,10 @@ function gameLoop(ts){
     sfxCharge(power);
   }
   requestAnimationFrame(gameLoop);
+  } catch(e) {
+    console.error('gameLoop error:', e);
+    requestAnimationFrame(gameLoop); // ALWAYS continue even on error
+  }
 }
 
 // ---- ANGLE SLIDER (touch/mobile) ----
@@ -2380,7 +2393,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v3.8
+     A321 前進楓之國  v3.9
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
