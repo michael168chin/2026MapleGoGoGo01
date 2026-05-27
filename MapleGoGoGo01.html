@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v3.2
+     版本：v3.3
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -365,6 +365,20 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
       <span class="setting-val" id="set-rounds-val">3</span>
     </div>
     <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
+    <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">🐟 魚群設定</div>
+    <div class="setting-row">
+      <label>魚群游速</label>
+      <input type="range" id="set-fish-spd" min="0.2" max="3.0" step="0.1" value="1.0"
+        oninput="document.getElementById('set-fish-spd-val').textContent=parseFloat(this.value).toFixed(1)">
+      <span class="setting-val" id="set-fish-spd-val">1.0</span>
+    </div>
+    <div class="setting-row">
+      <label>魚群數量</label>
+      <input type="range" id="set-fish-cnt" min="0" max="30" step="1" value="12"
+        oninput="document.getElementById('set-fish-cnt-val').textContent=this.value">
+      <span class="setting-val" id="set-fish-cnt-val">12</span>
+    </div>
+    <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">☁ 天空飄字（空白則不顯示）</div>
     <div id="sky-text-rows"></div>
     <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
@@ -515,7 +529,9 @@ const cfg = {
   speedMult: 2.5,
   ammoPerRound: 10,
   totalRounds: 3,
-  skyTexts: ['實動抽', '達標抽', '報聘抽二次', '報聘抽', '排名抽', ''],  // 6 groups
+  skyTexts: ['實動抽', '達標抽', '報聘抽2次', '排名抽', '', ''],  // 6 groups
+  fishSpeed: 1.0,  // multiplier, base is already slow
+  fishCount: 12,
 };
 
 // ===================== GOOGLE SHEETS =====================
@@ -821,6 +837,10 @@ function openSettings() {
     document.getElementById('set-rounds-val').textContent = cfg.totalRounds;
     loadPrizeSettingsUI();
     loadSkyTextUI();
+    const fspd=document.getElementById('set-fish-spd');
+    const fcnt=document.getElementById('set-fish-cnt');
+    if(fspd){fspd.value=cfg.fishSpeed;document.getElementById('set-fish-spd-val').textContent=cfg.fishSpeed.toFixed(1);}
+    if(fcnt){fcnt.value=cfg.fishCount;document.getElementById('set-fish-cnt-val').textContent=cfg.fishCount;}
     document.getElementById('settings-overlay').classList.add('active');
   });
 }
@@ -894,6 +914,10 @@ function applySettings() {
     const cnt=parseInt(document.getElementById('prize-cnt-'+i)?.value)||spec.count;
     spec.pts=amt; spec.count=cnt;
   });
+  const fspd=document.getElementById('set-fish-spd');
+  const fcnt=document.getElementById('set-fish-cnt');
+  if(fspd) cfg.fishSpeed=parseFloat(fspd.value)||1.0;
+  if(fcnt) cfg.fishCount=parseInt(fcnt.value)||12;
   // Save sky texts
   cfg.skyTexts.forEach((_,i)=>{
     const el=document.getElementById('sky-txt-'+i);
@@ -930,7 +954,7 @@ function resizeCanvas() {
   canvas.width  = cw;
   canvas.height = ch;
   cannonBase.x = Math.round(cw * 0.055);
-  cannonBase.y = Math.round(ch - ch * 0.20);
+  cannonBase.y = Math.round(ch - ch * 0.255);
 }
 // Use logical constants that scale with canvas size
 let W = 900, H = 500;
@@ -971,69 +995,75 @@ let leaves = [];
 let fish = [];
 function initFish(){
   fish=[];
-  for(let i=0;i<12;i++){
-    fish.push(createFish());
-  }
+  const n = cfg.fishCount||12;
+  for(let i=0;i<n;i++) fish.push(createFish());
+}
+function fishRiverBounds(){
+  const cw=canvas.width||900, ch=canvas.height||500;
+  // 5% margin from each shore edge
+  return {
+    riverL: cw*0.25,   // left edge with 5% margin from shore at ~20%
+    riverR: cw*0.65,   // right edge with 5% margin from shore at ~70%
+    waterTop: ch*0.64, // below the shore line
+    waterBot: ch*0.92,
+  };
 }
 function createFish(startRight){
-  const cw=canvas.width||900, ch=canvas.height||500;
-  const riverL=cw*0.22, riverR=cw*0.68;
-  const waterTop=ch*0.62, waterBot=ch*0.92;
+  const {riverL,riverR,waterTop,waterBot}=fishRiverBounds();
   const goRight=startRight!==undefined?startRight:(Math.random()>0.5);
+  const baseSpd=(0.25+Math.random()*0.35)*(cfg.fishSpeed||1.0); // 1/4 of original
   return {
-    x: goRight ? riverL : riverR,
-    y: waterTop + Math.random()*(waterBot-waterTop)*0.7,
-    vx: goRight?(1.2+Math.random()*1.8):(-(1.2+Math.random()*1.8)),
-    vy: (Math.random()-0.5)*0.4,
+    x: goRight ? riverL+5 : riverR-5,
+    y: waterTop + Math.random()*(waterBot-waterTop)*0.75,
+    vx: goRight ? baseSpd : -baseSpd,
+    vy: (Math.random()-0.5)*0.08,
     size: 8+Math.random()*14,
     color: ['#e87820','#f0a030','#c06010','#e0c860','#80b8d0','#f05050'][~~(Math.random()*6)],
     tailPhase: Math.random()*Math.PI*2,
     jumping: false,
-    jumpVy: 0,
-    jumpX: 0, jumpY: 0,
+    jumpVy: 0, jumpX: 0, jumpY: 0,
     splashed: false,
-    jumpTimer: 20+Math.random()*300, // frames until next jump attempt
+    // 10~20 seconds at ~60fps = 600~1200 frames
+    jumpTimer: 600+Math.random()*600,
   };
 }
 function updateFish(dt){
-  const cw=canvas.width, ch=canvas.height;
-  const riverL=cw*0.21, riverR=cw*0.69;
-  const waterTop=ch*0.59, waterBot=ch*0.96;
+  const {riverL,riverR,waterTop,waterBot}=fishRiverBounds();
+  // Rebuild if count changed
+  while(fish.length < (cfg.fishCount||12)) fish.push(createFish());
+  while(fish.length > (cfg.fishCount||12)) fish.pop();
+
   fish.forEach((f,fi)=>{
-    f.tailPhase+=dt*8;
+    f.tailPhase+=dt*4; // slower tail animation
     if(f.jumping){
-      f.jumpVy+=18*dt; // gravity
-      f.jumpX+=f.vx*dt*18;
-      f.jumpY+=f.jumpVy*dt*18;
-      // Splash on return
+      f.jumpVy+=16*dt; // gravity
+      f.jumpX+=f.vx*dt*14;
+      f.jumpY+=f.jumpVy*dt*14;
       if(f.jumpY>=0 && !f.splashed){
         f.splashed=true;
         spawnSplash(f.x+f.jumpX, f.y);
         sfxSplash();
       }
-      if(f.jumpY>30){
+      if(f.jumpY>ch*0.05){
         f.jumping=false; f.splashed=false;
         f.jumpX=0; f.jumpY=0;
-        f.jumpTimer=60+Math.random()*400;
+        f.jumpTimer=600+Math.random()*600; // 10~20s
       }
     } else {
-      f.x+=f.vx;
-      f.y+=f.vy;
-      f.vy+=(Math.random()-0.5)*0.12;
-      f.vy=Math.max(-0.8,Math.min(0.8,f.vy));
-      // Keep in river bounds
-      if(f.y<waterTop+f.size){f.y=waterTop+f.size;f.vy=Math.abs(f.vy);}
-      if(f.y>waterBot-f.size){f.y=waterBot-f.size;f.vy=-Math.abs(f.vy);}
-      // Wrap horizontally
-      if(f.x>riverR+20) fish[fi]=createFish(false);
-      if(f.x<riverL-20) fish[fi]=createFish(true);
-      // Jump trigger
+      const spd=(cfg.fishSpeed||1.0);
+      f.x += f.vx*spd;
+      f.y += f.vy*spd;
+      f.vy += (Math.random()-0.5)*0.04;
+      f.vy = Math.max(-0.3, Math.min(0.3, f.vy));
+      if(f.y<waterTop+f.size){f.y=waterTop+f.size; f.vy=Math.abs(f.vy);}
+      if(f.y>waterBot-f.size){f.y=waterBot-f.size; f.vy=-Math.abs(f.vy);}
+      if(f.x>riverR+10) fish[fi]=createFish(false);
+      if(f.x<riverL-10) fish[fi]=createFish(true);
       f.jumpTimer--;
-      if(f.jumpTimer<=0 && Math.random()<0.015){
-        f.jumping=true;
-        f.splashed=false;
-        f.jumpVy=-(8+Math.random()*5);
-        f.jumpTimer=80+Math.random()*300;
+      if(f.jumpTimer<=0){
+        f.jumping=true; f.splashed=false;
+        f.jumpVy=-(6+Math.random()*4);
+        f.jumpTimer=600+Math.random()*600;
       }
     }
   });
@@ -1042,22 +1072,38 @@ function drawFish(){
   fish.forEach(f=>{
     const fx= f.jumping ? f.x+f.jumpX : f.x;
     const fy= f.jumping ? f.y+f.jumpY : f.y;
-    const flip=f.vx<0;
     ctx.save();
     ctx.translate(fx,fy);
-    if(flip) ctx.scale(-1,1);
-    // Body
-    const tailWag=Math.sin(f.tailPhase)*f.size*0.28;
-    ctx.fillStyle=f.color;
-    ctx.beginPath();
-    ctx.ellipse(0,0,f.size,f.size*0.42,0,0,Math.PI*2);
-    ctx.fill();
-    // Tail
-    ctx.fillStyle=f.color;
-    ctx.beginPath();
-    ctx.moveTo(-f.size*0.7,0);
-    ctx.lineTo(-f.size*1.3,tailWag-f.size*0.35);
-    ctx.lineTo(-f.size*1.3,tailWag+f.size*0.35);
+    if(f.jumping){
+      // Fish head points up when jumping: rotate based on velocity
+      const jumpAngle=Math.atan2(f.jumpVy*14, f.vx*14);
+      ctx.rotate(jumpAngle-Math.PI/2); // head up
+      // Body (vertical)
+      const tailWag=Math.sin(f.tailPhase)*f.size*0.18;
+      ctx.fillStyle=f.color;
+      ctx.beginPath();ctx.ellipse(0,0,f.size*0.42,f.size,0,0,Math.PI*2);ctx.fill();
+      // Tail at bottom
+      ctx.beginPath();ctx.moveTo(0,f.size*0.7);
+      ctx.lineTo(tailWag-f.size*0.35,f.size*1.3);ctx.lineTo(tailWag+f.size*0.35,f.size*1.3);
+      ctx.closePath();ctx.fill();
+      // Eye
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(f.size*0.15,-f.size*0.5,f.size*0.15,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#222';ctx.beginPath();ctx.arc(f.size*0.17,-f.size*0.52,f.size*0.08,0,Math.PI*2);ctx.fill();
+    } else {
+      const flip=f.vx<0;
+      if(flip) ctx.scale(-1,1);
+      // Body
+      const tailWag=Math.sin(f.tailPhase)*f.size*0.28;
+      ctx.fillStyle=f.color;
+      ctx.beginPath();
+      ctx.ellipse(0,0,f.size,f.size*0.42,0,0,Math.PI*2);
+      ctx.fill();
+      // Tail
+      ctx.fillStyle=f.color;
+      ctx.beginPath();
+      ctx.moveTo(-f.size*0.7,0);
+      ctx.lineTo(-f.size*1.3,tailWag-f.size*0.35);
+      ctx.lineTo(-f.size*1.3,tailWag+f.size*0.35);
     ctx.closePath();ctx.fill();
     // Fin
     ctx.fillStyle='rgba(0,0,0,0.18)';
@@ -1080,20 +1126,20 @@ function spawnSplash(x,y){
 function sfxSplash(){
   try{
     const ac=getACtx();
-    // White noise burst (water)
-    const buf=ac.createBuffer(1,ac.sampleRate*0.18,ac.sampleRate);
+    // Gentle water splash: short filtered noise
+    const dur=0.22;
+    const buf=ac.createBuffer(1,Math.round(ac.sampleRate*dur),ac.sampleRate);
     const d=buf.getChannelData(0);
-    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/ac.sampleRate*18);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*0.6*Math.exp(-i/(ac.sampleRate*0.08));
     const src=ac.createBufferSource();
-    const lpf=ac.createBiquadFilter();lpf.type='lowpass';lpf.frequency.value=2200;
+    const lpf=ac.createBiquadFilter();lpf.type='lowpass';lpf.frequency.value=900;lpf.Q.value=1.5;
     const g=ac.createGain();
-    src.buffer=buf;
-    src.connect(lpf);lpf.connect(g);g.connect(ac.destination);
-    g.gain.setValueAtTime(0.28,ac.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.18);
-    src.start();src.stop(ac.currentTime+0.2);
-    // Plop tone
-    playTone(320,'sine',0.1,0.2,180);
+    src.buffer=buf;src.connect(lpf);lpf.connect(g);g.connect(ac.destination);
+    g.gain.setValueAtTime(0.18,ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+dur);
+    src.start();src.stop(ac.currentTime+dur+0.01);
+    // Soft plop
+    playTone(180,'sine',0.15,0.12,120);
   }catch(e){}
 }
 
@@ -1191,15 +1237,26 @@ canvas.addEventListener('mouseup',e=>{
   if(e.button!==0||!charging||projectile||ammoLeft<=0||hitPopupPending)return;
   charging=false; fire();
 });
-// On touch devices: canvas touch ONLY adjusts angle (no accidental firing)
-// Firing is controlled exclusively via the angle slider hold mechanism
+// Canvas touch: drag to adjust angle; hold still 3s to charge+fire
+let _touchHoldTimer=null, _touchCharging=false, _touchHoldStart=0;
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
-  if(hitPopupPending||gameOver) return;
+  if(hitPopupPending||gameOver||ammoLeft<=0||projectile) return;
   const r=canvas.getBoundingClientRect(),sc=canvas.width/r.width,t=e.touches[0];
   updateAngle((t.clientX-r.left)*sc,(t.clientY-r.top)*sc);
   updateHUD();
   if(window._syncAngleSlider) _syncAngleSlider();
+  // Start hold timer
+  _touchHoldStart=performance.now();
+  _touchCharging=false;
+  if(_touchHoldTimer) clearTimeout(_touchHoldTimer);
+  _touchHoldTimer=setTimeout(()=>{
+    if(!hitPopupPending&&!gameOver&&ammoLeft>0&&!projectile){
+      _touchCharging=true;
+      charging=true;
+      chargeStart=performance.now();
+    }
+  },3000);
 },{passive:false});
 canvas.addEventListener('touchmove',e=>{
   e.preventDefault();
@@ -1209,10 +1266,26 @@ canvas.addEventListener('touchmove',e=>{
   updateHUD();
   if(window._syncAngleSlider) _syncAngleSlider();
   if(Math.abs(angle-_prevAngle)>0.02){sfxAngleTick();_prevAngle=angle;}
+  // Reset hold timer on movement (must be still for 3s)
+  if(!_touchCharging){
+    _touchHoldStart=performance.now();
+    if(_touchHoldTimer){clearTimeout(_touchHoldTimer);_touchHoldTimer=null;}
+    _touchHoldTimer=setTimeout(()=>{
+      if(!hitPopupPending&&!gameOver&&ammoLeft>0&&!projectile){
+        _touchCharging=true; charging=true; chargeStart=performance.now();
+      }
+    },3000);
+  }
 },{passive:false});
 canvas.addEventListener('touchend',e=>{
   e.preventDefault();
-  // No firing from canvas touch — use slider
+  if(_touchHoldTimer){clearTimeout(_touchHoldTimer);_touchHoldTimer=null;}
+  if(_touchCharging){
+    _touchCharging=false; charging=false;
+    if(!projectile&&ammoLeft>0&&!hitPopupPending) fire();
+  } else {
+    charging=false;
+  }
 },{passive:false});
 
 function fire() {
@@ -1399,9 +1472,27 @@ function drawBackground(){
   const leftShore  = shoreEdge(leftX,  true,  shoreY, amp, 0.055, 0);
   const rightShore = shoreEdge(rightX, false, shoreY, amp*0.9, 0.06, 1.5);
 
-  // Left ground — fill from left edge to shore edge
-  const gL=ctx.createLinearGradient(0,shoreY-amp,0,ch);
-  gL.addColorStop(0,'#3a6b2a');gL.addColorStop(0.08,'#2d5220');gL.addColorStop(0.25,'#4a3010');gL.addColorStop(1,'#2a1a08');
+  // ---- DRAW ORDER: river first (full rect), then grounds on top ----
+
+  // 1. River background rectangle (full span, no gaps)
+  const rv=ctx.createLinearGradient(leftX,0,rightX,0);
+  rv.addColorStop(0,'#1a4a8a');rv.addColorStop(0.25,'#1a6db5');rv.addColorStop(0.5,'#2980b9');rv.addColorStop(0.75,'#1a6db5');rv.addColorStop(1,'#1a4a8a');
+  ctx.fillStyle=rv;
+  ctx.fillRect(0, shoreY, cw, ch); // full width rect so no gaps
+
+  // River shimmer
+  ctx.strokeStyle='rgba(255,255,255,0.13)';ctx.lineWidth=1.2;
+  for(let ry=shoreY+amp*3;ry<ch;ry+=16){
+    ctx.beginPath();ctx.moveTo(leftX,ry);
+    for(let rx2=leftX;rx2<=rightX;rx2+=10){ctx.lineTo(rx2,ry+Math.sin((rx2+ry)*0.18)*2.5);}
+    ctx.stroke();
+  }
+  ctx.save();ctx.globalAlpha=0.07;ctx.fillStyle='#fff';
+  ctx.fillRect(cw*0.42,shoreY+amp*3,cw*0.06,ch);ctx.restore();
+
+  // 2. Left ground — drawn on top of river
+  const gL=ctx.createLinearGradient(0,shoreY,0,ch);
+  gL.addColorStop(0,'#3a6b2a');gL.addColorStop(0.1,'#2d5220');gL.addColorStop(0.28,'#4a3010');gL.addColorStop(1,'#2a1a08');
   ctx.fillStyle=gL;
   ctx.beginPath();
   ctx.moveTo(0, ch);
@@ -1409,60 +1500,30 @@ function drawBackground(){
   leftShore.forEach(([x,y])=>ctx.lineTo(x,y));
   ctx.lineTo(leftShore[leftShore.length-1][0], ch);
   ctx.closePath(); ctx.fill();
-
-  // Green grass along left shore
+  // Left grass strip
   ctx.fillStyle='#3a8c40';
   ctx.beginPath();
-  leftShore.slice(0,8).forEach(([x,y],i)=>{ i===0?ctx.moveTo(x,y-4):ctx.lineTo(x,y-4); });
-  for(let i=7;i>=0;i--) ctx.lineTo(leftShore[i][0], leftShore[i][1]+5);
-  ctx.closePath(); ctx.fill();
+  leftShore.forEach(([x,y],i)=>{i===0?ctx.moveTo(x,y-4):ctx.lineTo(x,y-4);});
+  leftShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y+5));
+  ctx.closePath();ctx.fill();
 
-  // River fill — between left shore edge and right shore edge
-  const rv=ctx.createLinearGradient(leftX,0,rightX,0);
-  rv.addColorStop(0,'#1a4a8a');rv.addColorStop(0.3,'#1a6db5');rv.addColorStop(0.5,'#2980b9');rv.addColorStop(0.7,'#1a6db5');rv.addColorStop(1,'#1a4a8a');
-  ctx.fillStyle=rv;
-  ctx.beginPath();
-  // Down left shore
-  leftShore.forEach(([x,y],i)=>{ i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
-  // Across bottom
-  ctx.lineTo(rightShore[rightShore.length-1][0], ch);
-  // Up right shore (reversed)
-  rightShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y));
-  ctx.closePath(); ctx.fill();
-
-  // River shimmer lines
-  ctx.strokeStyle='rgba(255,255,255,0.13)';ctx.lineWidth=1.2;
-  for(let y=shoreY+amp*2;y<ch;y+=16){
-    // find x bounds from shore edges at this y
-    const lx=leftShore.find(p=>p[1]>=y)?.[0]??leftX;
-    const rx=rightShore.find(p=>p[1]>=y)?.[0]??rightX;
-    ctx.beginPath();ctx.moveTo(lx,y);
-    for(let x=lx;x<=rx;x+=10){ctx.lineTo(x,y+Math.sin((x+y)*0.18)*2.5);}
-    ctx.stroke();
-  }
-  ctx.save();ctx.globalAlpha=0.08;ctx.fillStyle='#fff';
-  ctx.fillRect(cw*0.42,shoreY+amp*2,cw*0.06,ch);ctx.restore();
-
-  // Right ground — correct gradient (vertical, top to bottom)
+  // 3. Right ground — drawn on top of river, from rightShore edge to right canvas edge
   const gR=ctx.createLinearGradient(0,shoreY,0,ch);
-  gR.addColorStop(0,'#3a6b2a');gR.addColorStop(0.08,'#2d5220');gR.addColorStop(0.25,'#4a3010');gR.addColorStop(1,'#2a1a08');
+  gR.addColorStop(0,'#3a6b2a');gR.addColorStop(0.1,'#2d5220');gR.addColorStop(0.28,'#4a3010');gR.addColorStop(1,'#2a1a08');
   ctx.fillStyle=gR;
   ctx.beginPath();
   ctx.moveTo(cw, ch);
-  ctx.lineTo(cw, shoreY-ch*0.01);
+  ctx.lineTo(cw, shoreY);
+  // Walk right shore from top-right down to bottom
   rightShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y));
   ctx.lineTo(rightShore[0][0], ch);
   ctx.closePath(); ctx.fill();
-
-  // Green grass right shore
+  // Right grass strip
   ctx.fillStyle='#3a8c40';
-  const rsTop=rightShore.filter(([x,y])=>y<shoreY+amp*2);
-  if(rsTop.length>1){
-    ctx.beginPath();
-    rsTop.forEach(([x,y],i)=>{i===0?ctx.moveTo(x,y-3):ctx.lineTo(x,y-3);});
-    rsTop.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y+6));
-    ctx.closePath();ctx.fill();
-  }
+  ctx.beginPath();
+  rightShore.slice().reverse().forEach(([x,y],i)=>{i===0?ctx.moveTo(x,y-4):ctx.lineTo(x,y-4);});
+  rightShore.forEach(([x,y])=>ctx.lineTo(x,y+5));
+  ctx.closePath();ctx.fill();
 
   // ---- CASTLE ----
   drawCastle();
@@ -2293,7 +2354,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v3.2
+     A321 前進楓之國  v3.3
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
