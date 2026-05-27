@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v3.5
+     版本：v3.6
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -361,8 +361,9 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
           <div class="char-name">召喚師</div>
         </div>
     </div>
-    <div style="text-align:center;margin-top:8px;">
+    <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn" onclick="confirmChar()">⚔ 進入戰場！</button>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v3.6</div>
     </div>
   </div>
 </div>
@@ -594,10 +595,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiy3PBuK_JOID8
 async function gsRegisterPlayer(name, character) {
   if (!APPS_SCRIPT_URL) return;
   try {
-    // Check existing players first — skip if identical record exists
-    const existing = await gsLoadPlayers().catch(()=>[]);
-    const dup = existing.some(p => p.name===name && p.character===character);
-    if (dup) { console.log('已有相同玩家記錄，略過寫入'); return; }
+    // Direct write — no pre-check to avoid double-fetch hangs
     await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -778,7 +776,13 @@ async function loadExistingPlayers() {
     if (!section || !select) return;
     if (!APPS_SCRIPT_URL) { section.style.display='none'; return; }
     let players = [];
-    try { players = await gsLoadPlayers(); } catch(e) { players = []; }
+    try {
+      // Add 6s timeout so Safari doesn't hang indefinitely
+      players = await Promise.race([
+        gsLoadPlayers(),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),6000))
+      ]);
+    } catch(e) { players = []; }
     if (!players || !players.length) { section.style.display='none'; return; }
     section.style.display='block';
     select.innerHTML = '<option value="">── 選擇已有玩家 ──</option>';
@@ -812,24 +816,30 @@ function applyExistingPlayer() {
   if (charIdx >= 0) selectChar(charIdx);
 }
 
-async function confirmChar() {
+function confirmChar() {
+  // Step 1: IMMEDIATELY close overlay — never block on network
+  const ovEl = document.getElementById('char-overlay');
+  if(ovEl) ovEl.classList.remove('active');
+
+  // Step 2: Read values (synchronous)
   try {
     const nmEl = document.getElementById('player-name-input');
-    const nm = nmEl ? nmEl.value.trim() : '';
-    playerName = nm || '冒險者';
+    playerName = (nmEl ? nmEl.value.trim() : '') || '冒險者';
     myCharDef = CHAR_DEFS[selectedChar] || CHAR_DEFS[0];
     const pdEl = document.getElementById('player-display');
     if(pdEl) pdEl.textContent = playerName;
-    const ovEl = document.getElementById('char-overlay');
-    if(ovEl) ovEl.classList.remove('active');
-    // Write to Google Sheets (non-blocking, never throw)
-    gsRegisterPlayer(playerName, myCharDef.name).catch(()=>{});
   } catch(e) {
-    console.warn('confirmChar error:', e);
-    // Fallback: just close overlay
-    const ovEl = document.getElementById('char-overlay');
-    if(ovEl) ovEl.classList.remove('active');
+    playerName = playerName || '冒險者';
+    myCharDef = myCharDef || CHAR_DEFS[0];
   }
+
+  // Step 3: Google Sheets in background — with 5s timeout safety
+  setTimeout(()=>{
+    Promise.race([
+      gsRegisterPlayer(playerName, myCharDef ? myCharDef.name : '戰士'),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))
+    ]).catch(()=>{});
+  }, 100);
 }
 
 // ===================== SETTINGS =====================
@@ -2362,7 +2372,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v3.5
+     A321 前進楓之國  v3.6
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
