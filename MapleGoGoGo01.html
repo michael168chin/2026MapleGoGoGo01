@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v2.8
+     版本：v2.9
      日期：2026-05-27
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -746,7 +746,7 @@ function resizeCanvas() {
   if (ch > availH) { ch = Math.max(availH, 80); cw = Math.round(ch * 900 / 500); }
   canvas.width  = cw;
   canvas.height = ch;
-  cannonBase.x = Math.round(cw * 0.165);
+  cannonBase.x = Math.round(cw * 0.10);
   cannonBase.y = Math.round(ch - ch * 0.155);
 }
 // Use logical constants that scale with canvas size
@@ -760,7 +760,7 @@ let power = 0.5, angle = -Math.PI/4;
 let projectile = null, trail = [];
 let particles = [];
 
-let cannonBase = { x: 100, y: 422 }; // updated by resizeCanvas()
+let cannonBase = { x: 90, y: 422 }; // updated by resizeCanvas()
 
 // Target specs (mutable — editable via settings)
 let TARGET_SPECS = [
@@ -984,35 +984,100 @@ function drawBackground(){
   // Clouds
   clouds.forEach(c=>drawCloud(c.x,c.y,c.s));
 
-  // ---- GROUND AREAS ----
-  // Left ground (0~20%)
-  const gL=ctx.createLinearGradient(0,ch*0.60,0,ch);
-  gL.addColorStop(0,'#3a6b2a');gL.addColorStop(0.12,'#2d5220');gL.addColorStop(0.3,'#4a3010');gL.addColorStop(1,'#2a1a08');
-  ctx.fillStyle=gL;ctx.fillRect(0,ch*0.60,cw*0.20,ch);
+  // ---- GROUND AREAS with wavy shorelines ----
+  // Wave helper: build wavy path from x0 to x1 at base y with amplitude amp
+  function wavyTop(x0, x1, baseY, amp, freq, phase){
+    const pts=[];
+    for(let x=x0;x<=x1+1;x+=3){
+      const y=baseY + Math.sin((x*freq)+phase)*amp + Math.cos((x*freq*0.6)+phase*1.3)*amp*0.4;
+      pts.push([x,y]);
+    }
+    return pts;
+  }
 
-  // River (20%~70%)
-  const riverL=cw*0.20, riverR=cw*0.70, riverW=riverR-riverL;
-  const rv=ctx.createLinearGradient(riverL,0,riverR,0);
+  const shoreY   = ch*0.595;   // average shore height
+  const amp      = ch*0.014;   // wave amplitude
+  const freq     = 0.045;      // wave frequency
+  const leftX    = cw*0.20;    // river left edge
+  const rightX   = cw*0.70;    // river right edge
+
+  // Pre-compute wavy edges (same path used for both ground and river)
+  const leftShore  = wavyTop(0,       leftX,  shoreY,       amp,   freq,   0);
+  const rightShore = wavyTop(rightX,  cw,     shoreY-ch*0.012, amp*0.9, freq*1.1, 1.2);
+
+  // Left ground — fill down from wavy top to bottom
+  const gL=ctx.createLinearGradient(0,shoreY-amp,0,ch);
+  gL.addColorStop(0,'#3a6b2a');gL.addColorStop(0.08,'#2d5220');gL.addColorStop(0.25,'#4a3010');gL.addColorStop(1,'#2a1a08');
+  ctx.fillStyle=gL;
+  ctx.beginPath();
+  ctx.moveTo(0, ch);
+  ctx.lineTo(0, leftShore[0][1]);
+  leftShore.forEach(([x,y])=>ctx.lineTo(x,y));
+  ctx.lineTo(leftX, ch);
+  ctx.closePath(); ctx.fill();
+
+  // Green grass strip following left wavy shore
+  ctx.fillStyle='#3a8c40';
+  ctx.beginPath();
+  leftShore.forEach(([x,y],i)=>{ i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  leftShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y+8));
+  ctx.closePath(); ctx.fill();
+
+  // River fill — rectangle base then wavy top cutout on both sides
+  const rv=ctx.createLinearGradient(leftX,0,rightX,0);
   rv.addColorStop(0,'#1a4a8a');rv.addColorStop(0.3,'#1a6db5');rv.addColorStop(0.5,'#2980b9');rv.addColorStop(0.7,'#1a6db5');rv.addColorStop(1,'#1a4a8a');
-  ctx.fillStyle=rv;ctx.fillRect(riverL,ch*0.58,riverW,ch);
+  ctx.fillStyle=rv;
+  ctx.beginPath();
+  ctx.moveTo(leftX, ch);
+  // Left wavy shore (last point going right)
+  const leftEdge = wavyTop(leftX, leftX, shoreY, amp, freq, 0);
+  ctx.lineTo(leftX, leftShore[leftShore.length-1][1]);
+  leftShore.slice().reverse().forEach(([x,y])=>{ if(x>=leftX-2) ctx.lineTo(x,y); });
+  // across top
+  ctx.lineTo(0, leftShore[0][1]);
+  ctx.lineTo(0, leftShore[0][1]+1);
+  // skip — just fill rect from leftX
+  ctx.restore(); ctx.save(); // reset then fill river simpler:
+  ctx.fillStyle=rv;
+  ctx.beginPath();
+  ctx.moveTo(leftX, ch);
+  // left bank wavy edge
+  const lwPts = wavyTop(leftX, rightX, shoreY, amp, freq, 0);
+  ctx.lineTo(leftX, lwPts[0][1]);
+  lwPts.forEach(([x,y])=>ctx.lineTo(x,y));
+  ctx.lineTo(rightX, ch);
+  ctx.closePath(); ctx.fill();
+
+  // River shimmer
   ctx.strokeStyle='rgba(255,255,255,0.14)';ctx.lineWidth=1.2;
-  for(let y=ch*0.61;y<ch;y+=16){
-    ctx.beginPath();ctx.moveTo(riverL,y);
-    for(let x=riverL;x<=riverR;x+=10){ctx.lineTo(x,y+Math.sin((x+y)*0.18)*2.5);}
+  for(let y=shoreY+amp+ch*0.02;y<ch;y+=16){
+    ctx.beginPath();ctx.moveTo(leftX,y);
+    for(let x=leftX;x<=rightX;x+=10){ctx.lineTo(x,y+Math.sin((x+y)*0.18)*2.5);}
     ctx.stroke();
   }
-  ctx.save();ctx.globalAlpha=0.10;ctx.fillStyle='#fff';
-  ctx.fillRect(cw*0.42,ch*0.58,cw*0.06,ch);ctx.restore();
+  ctx.save();ctx.globalAlpha=0.09;ctx.fillStyle='#fff';
+  ctx.fillRect(cw*0.42,shoreY+amp*2,cw*0.06,ch);ctx.restore();
 
-  // Right ground (70%~100%)
-  const gR=ctx.createLinearGradient(0,ch*0.57,0,ch);
-  gR.addColorStop(0,'#3a6b2a');gR.addColorStop(0.12,'#2d5220');gR.addColorStop(0.3,'#4a3010');gR.addColorStop(1,'#2a1a08');
-  ctx.fillStyle=gR;ctx.fillRect(cw*0.70,ch*0.57,cw*0.30,ch);
+  // Right ground — fill down from wavy top
+  const gR=ctx.createLinearGradient(0,shoreY-amp,0,ch);
+  gR.addColorStop(0,'#3a6b2a');gR.addColorStop(0.08,'#2d5220');gR.addColorStop(0.25,'#4a3010');gR.addColorStop(1,'#2a1a08');
+  ctx.fillStyle=gR;
+  ctx.beginPath();
+  ctx.moveTo(rightX, ch);
+  const rwPts = wavyTop(leftX, rightX, shoreY, amp, freq, 0);
+  ctx.lineTo(rightX, rwPts[rwPts.length-1][1]);
+  rwPts.slice().reverse().forEach(([x,y])=>{ if(x>=rightX-2) ctx.lineTo(x,y); });
+  // right shore extends to canvas edge
+  rightShore.forEach(([x,y])=>ctx.lineTo(x,y));
+  ctx.lineTo(cw, ch);
+  ctx.closePath(); ctx.fill();
 
-  // Grass top edges
+  // Green grass right shore
   ctx.fillStyle='#3a8c40';
-  ctx.fillRect(0,ch*0.60,cw*0.20,8);
-  ctx.fillRect(cw*0.70,ch*0.57,cw*0.30,8);
+  ctx.beginPath();
+  rightShore.forEach(([x,y],i)=>{ i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  rightShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y+8));
+  ctx.closePath(); ctx.fill();
 
   // ---- CASTLE ----
   drawCastle();
@@ -1090,7 +1155,7 @@ function drawCloud(cx,cy,s){
 function drawCastle(){
   const cw=canvas.width, ch=canvas.height;
   // Scale factor — castle occupies left ~18% of canvas
-  const S = cw * 0.0022; // base scale unit
+  const S = cw * 0.00155; // base scale unit — reduced height
   const bx = cw * 0.005; // base left anchor
   const by = ch * 0.60;  // ground line
 
