@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v5.2
+     版本：v5.3
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.2</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.3</div>
     </div>
   </div>
 </div>
@@ -1026,6 +1026,12 @@ Object.defineProperty(window, 'H', { get: () => canvas.height });
 let score = 0, round = 1, ammoLeft = cfg.ammoPerRound;
 let gameOver = false, charging = false, chargeStart = 0;
 let power = 0.5, angle = -Math.PI/4;
+let yaw = 0; // horizontal aim: -PI/6 = left 30°, 0 = straight, +PI/6 = right 30°
+const YAW_MAX = Math.PI/6;   // ±30°
+const YAW_SENS = 0.006;      // radians per pixel (left-side drag)
+// 3D perspective constants
+const FOCAL_Z = 8.0;         // perspective focal length in Z units
+// projectile now has 3D state: {x,y,z,vx,vy,vz,r}
 let projectile = null, trail = [];
 let particles = [];
 
@@ -1489,8 +1495,10 @@ function renderAmmoBar() {
 function updateHUD() {
   document.getElementById('score-display').textContent=score;
   document.getElementById('round-display').textContent=`${round}/${cfg.totalRounds}`;
-  const degDisp = Math.round(-angle * 180/Math.PI);
-  document.getElementById('angle-display').textContent=degDisp+'°';
+  const pitchDeg = Math.round(-angle * 180/Math.PI);
+  const yawDeg   = Math.round(yaw * 180/Math.PI);
+  const yawStr   = yawDeg===0 ? '正對' : (yawDeg>0 ? '右'+yawDeg+'°' : '左'+Math.abs(yawDeg)+'°');
+  document.getElementById('angle-display').textContent=pitchDeg+'° '+yawStr;
   const pct=Math.round(power*100);
   document.getElementById('power-display').textContent=pct+'%';
   document.getElementById('power-bar-fill').style.width=pct+'%';
@@ -1530,8 +1538,9 @@ canvas.addEventListener('mouseup',e=>{
 // Hold still 2s = start charging; release = fire
 let _touchHoldTimer=null, _touchCharging=false;
 let _touchLastY=0, _touchStartY=0, _touchLastX=0, _touchStartX=0, _touchMoved=false;
-const TOUCH_ANGLE_SENS = 0.008; // radians per pixel of vertical drag
-const TOUCH_POWER_SENS = 0.004; // power change per pixel of horizontal drag
+const TOUCH_ANGLE_SENS = 0.008; // radians per pixel of vertical drag (right half)
+const TOUCH_POWER_SENS = 0.004; // power change per pixel of horizontal drag (right half)
+// Left half of canvas: vertical drag = yaw
 
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
@@ -1583,17 +1592,26 @@ canvas.addEventListener('touchmove',e=>{
     }
   }
   if(!_touchCharging){
-    // Determine dominant axis of movement
     const absX = Math.abs(dx), absY = Math.abs(dy);
-    if(absY > absX){
-      // Vertical drag → adjust angle
-      const AMAX=-Math.PI/2, AMIN=Math.PI/10;
-      angle = Math.max(AMAX, Math.min(AMIN, angle + dy * TOUCH_ANGLE_SENS));
-      if(absY>1){ sfxAngleTick(); _prevAngle=angle; }
+    const r2=canvas.getBoundingClientRect();
+    const canvasMidX = r2.left + r2.width/2;
+    const isLeftHalf = _touchStartX < canvasMidX;
+    if(isLeftHalf){
+      // LEFT HALF: vertical drag = yaw (left-right aim direction)
+      // drag up = aim more right, drag down = aim more left
+      if(absY > 1){
+        yaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, yaw - dy * YAW_SENS));
+        sfxAngleTick(); _prevAngle=angle;
+      }
     } else {
-      // Horizontal drag → adjust power (landing distance)
-      // Swipe right = more power (farther), swipe left = less power (closer)
-      power = Math.max(0.05, Math.min(1.0, power + dx * TOUCH_POWER_SENS));
+      // RIGHT HALF: vertical = pitch, horizontal = power
+      if(absY > absX){
+        const AMAX=-Math.PI/2, AMIN=Math.PI/10;
+        angle = Math.max(AMAX, Math.min(AMIN, angle + dy * TOUCH_ANGLE_SENS));
+        if(absY>1){ sfxAngleTick(); _prevAngle=angle; }
+      } else {
+        power = Math.max(0.05, Math.min(1.0, power + dx * TOUCH_POWER_SENS));
+      }
     }
     updateHUD();
   }
@@ -1611,20 +1629,27 @@ canvas.addEventListener('touchend',e=>{
 },{passive:false});
 
 function fire() {
-  const minSpd=8,maxSpd=24;
-  const spd=minSpd+power*(maxSpd-minSpd);
-  const tipX=cannonBase.x+Math.cos(angle)*46;
-  const tipY=cannonBase.y+Math.sin(angle)*46;
-  projectile={x:tipX,y:tipY,vx:Math.cos(angle)*spd,vy:Math.sin(angle)*spd,r:8};
+  const minSpd=8, maxSpd=24;
+  const spd = minSpd + power*(maxSpd-minSpd);
+  const pitch = angle; // negative = upward
+  // 3D velocity: yaw rotates the XZ plane
+  // pitch controls Y and the horizontal magnitude
+  const hSpd = Math.cos(pitch) * spd;  // horizontal speed magnitude
+  const vx3 = hSpd * Math.cos(yaw);    // X component (yaw=0 → pure right)
+  const vy3 = Math.sin(pitch) * spd;   // Y component (negative = up)
+  const vz3 = hSpd * Math.sin(yaw);    // Z component (yaw>0 → right = away)
+  const tipX = cannonBase.x + Math.cos(pitch)*Math.cos(yaw)*46;
+  const tipY = cannonBase.y + Math.sin(pitch)*46;
+  projectile = {
+    x:tipX, y:tipY,
+    z: 0.2,           // start just in front of cannon
+    vx:vx3, vy:vy3, vz:vz3, r:8
+  };
   stopWhistle();
-  _projWasAbove=false;
-  _projWasInWater=false;
-  trail=[];
-  ammoLeft--;
-  power=0.5;
-  sfxFire();
-  updateHUD();
-  spawnMuzzle(tipX,tipY);
+  _projWasAbove=false; _projWasInWater=false; trail=[];
+  ammoLeft--; power=0.5;
+  sfxFire(); updateHUD();
+  spawnMuzzle(tipX, tipY);
 }
 
 function spawnMuzzle(x,y){
@@ -2227,8 +2252,16 @@ function drawCannon(){
   ctx.strokeStyle='#806000';ctx.lineWidth=1.5*sc;ctx.stroke();
 
   // ---- DARK BARREL ----
+  // Visual yaw: barrel appears shorter when aimed sideways, offset left/right
+  const yawVis = yaw; // -PI/6 to PI/6
+  const barrelScaleX = Math.cos(yawVis); // shorter when turned
+  const barrelOffX   = Math.sin(yawVis) * 18*sc; // lateral offset
+
   ctx.save();
-  ctx.translate(x,y+6*sc);ctx.rotate(angle);
+  ctx.translate(x + barrelOffX, y+6*sc);
+  ctx.rotate(angle);
+  // Apply perspective squeeze for yaw
+  ctx.scale(barrelScaleX, 1);
   // Barrel body gradient (dark grey/black like the image)
   const barrelLen=52*sc, barrelR=10*sc;
   const barrelGrad=ctx.createLinearGradient(0,-barrelR,0,barrelR);
@@ -2330,44 +2363,61 @@ function drawTargets(){
   });
 }
 
+// ---- 3D → screen projection ----
+// Projects 3D world position to canvas 2D screen position
+// World origin = cannon base area; Z goes away from viewer
+function proj3D(wx, wy, wz){
+  const scale = FOCAL_Z / Math.max(0.1, FOCAL_Z + wz);
+  // Screen origin for projection: cannon base area
+  const ox = cannonBase.x;
+  const oy = cannonBase.y;
+  const sx = ox + (wx - ox) * scale;
+  const sy = oy + (wy - oy) * scale;
+  return {sx, sy, scale};
+}
+
 // ---- Projectile ----
 let _projWasAbove=false;
 let _projWasInWater=false; // track water entry
 function updateProjectile(dt){
   if(!projectile)return;
-  trail.push({x:projectile.x,y:projectile.y});
-  if(trail.length>24)trail.shift();
-  projectile.vy+=9.8*dt;
-  projectile.x+=projectile.vx;
-  projectile.y+=projectile.vy;
+
+  // 3D physics step
+  projectile.vy += 9.8*dt;   // gravity on Y
+  projectile.x  += projectile.vx;
+  projectile.y  += projectile.vy;
+  projectile.z  = (projectile.z||0) + projectile.vz;
+
+  // Clamp Z so projectile doesn't go behind viewer
+  if(projectile.z < 0) projectile.z = 0;
+
+  // Project to screen for trail
+  const {sx, sy, scale} = proj3D(projectile.x, projectile.y, projectile.z);
+  trail.push({x:sx, y:sy, s:scale});
+  if(trail.length>28)trail.shift();
 
   // Whistle when falling from above screen
-  if(projectile.y<0){ _projWasAbove=true; }
+  if(sy < 0){ _projWasAbove=true; }
   if(_projWasAbove && projectile.vy>0){ updateWhistle(projectile.vy); }
 
-  // ---- 3D Z-axis value for projectile ----
-  const pZ = projZ(projectile.x); // 0 near cannon, 9 near targets
-
-  // ---- Target hit check (targets live at Z≈9, only on downward flight) ----
-  // Only allow hit when projectile is descending (vy>0) or nearly horizontal
-  if(projectile.vy > -1){  // not strongly ascending
+  // ---- Target hit check ----
+  // Targets sit at Z≈9 (right bank). Only valid hit if projectile Z is close.
+  if(projectile.vy > -2){ // not strongly ascending
     for(const t of targets){
       if(t.hit) continue;
       const tx=getGroupCX()+t.ox, ty=getGroupCY()+t.oy;
-      const dx=projectile.x-tx, dy=projectile.y-ty;
-      const dist2D=Math.sqrt(dx*dx+dy*dy);
-      // 3D check: Z must be close to target zone (Z≈8~10)
-      const zOK = pZ >= 7.5;
-      if(dist2D < t.r+projectile.r && zOK){
-        t.hit=true;
-        hitPopupPending=true;
+      const tZ = Z_TARGETS; // targets at far Z
+      // 3D distance
+      const dx=projectile.x-tx, dy=projectile.y-ty, dz=projectile.z-tZ;
+      const dist3D=Math.sqrt(dx*dx+dy*dy+dz*dz*0.6);
+      if(dist3D < t.r+projectile.r){
+        t.hit=true; hitPopupPending=true;
         score+=t.pts;
-        spawnHit(tx,ty,tierColor(t.pts));
-        stopWhistle();
-        sfxHit(t.pts);
-        updateHUD();
+        const {sx:hsx,sy:hsy}=proj3D(tx,ty,tZ);
+        spawnHit(hsx,hsy,tierColor(t.pts));
+        stopWhistle(); sfxHit(t.pts); updateHUD();
         projectile=null; trail=[];
-        const _hpx=tx,_hpy=ty,_hpts=t.pts,_hci=t.charIdx;
+        const _hpx=hsx,_hpy=hsy,_hpts=t.pts,_hci=t.charIdx;
         setTimeout(()=>{ showHitPopup(_hpx,_hpy,_hpts,_hci); },1500);
         checkRoundEnd();
         return;
@@ -2376,71 +2426,43 @@ function updateProjectile(dt){
   }
 
   // ---- Water surface entry detection ----
-  const {riverL,riverR}=fishRiverBounds();
+  // Use projected screen position for visual checks
+  const {sx:psx, sy:psy} = proj3D(projectile.x, projectile.y, projectile.z);
   const waterSurfaceY = canvas.height * 0.595;
-  const inLakeX = projectile.x > canvas.width*0.22 && projectile.x < canvas.width*0.72;
+  const pZ3 = projectile.z;
+  // Lake Z range: 2~6 (lake exists in middle depth)
+  const inLakeZ = pZ3 >= 1.5 && pZ3 <= 7.0;
+  const inLakeX = psx > canvas.width*0.22 && psx < canvas.width*0.72;
 
-  if(!_projWasInWater && projectile.vy > 0 &&
-     projectile.y >= waterSurfaceY && projectile.y < waterSurfaceY + Math.abs(projectile.vy)+2 &&
-     inLakeX){
+  if(!_projWasInWater && projectile.vy > 0 && inLakeX && inLakeZ &&
+     psy >= waterSurfaceY && psy < waterSurfaceY + Math.abs(projectile.vy)*1.5+4){
     _projWasInWater = true;
     stopWhistle();
-    // ---- 3D fish hit check at water entry ----
-    // Only fish whose Z is close to projectile's Z at this X position
+    // Fish hit check: 3D sphere collision
     let hitAFish = false;
     for(let fi=0;fi<fish.length;fi++){
       const f=fish[fi];
       if(f.stunTimer>0 || f.jumping) continue;
-      const fx2=f.x, fy2=f.y;
-      // 3D distance check
-      const fdx=projectile.x-fx2, fdy=projectile.y-fy2;
-      const dist2D=Math.sqrt(fdx*fdx+fdy*fdy);
-      // Z axis: fish depth vs projectile depth at this X
-      const fz=fishZ(fy2);
-      const zDiff=Math.abs(pZ-fz);
-      // XY close enough AND Z planes overlap
-      if(dist2D < f.size*2.2 + projectile.r && zDiff < 1.8){
+      const fz = fishZ(f.y);
+      const fdx=projectile.x-f.x, fdy=projectile.y-f.y, fdz=pZ3-fz;
+      const dist3=Math.sqrt(fdx*fdx+fdy*fdy*0.5+fdz*fdz*0.8);
+      if(dist3 < f.size*2.0 + projectile.r){
         f.stunTimer=150; f.flipped=true;
-        f.vx=(fdx/Math.max(1,dist2D))*2+(Math.random()-0.5);
-        f.vy=-3.5-Math.random()*2; // launch upward
+        f.vx=(fdx/Math.max(1,Math.abs(fdx)))*2+(Math.random()-0.5);
+        f.vy=-3.5-Math.random()*2;
         f.jumping=false;
-        // Fish flies out of water with big explosion
-        spawnWaterFishHit(fx2, fy2, f.color, projectile.vy, projectile.vx);
+        spawnWaterFishHit(f.x, f.y, f.color, projectile.vy, projectile.vx);
         hitAFish=true;
       }
     }
-    if(hitAFish){
-      spawnWaterEntry(projectile.x, projectile.vy*1.4, projectile.vx); // extra big
-    } else {
-      spawnWaterEntry(projectile.x, projectile.vy, projectile.vx);
-    }
-    // Projectile sinks: remove after entry
+    spawnWaterEntry(psx, projectile.vy*(hitAFish?1.5:1.0), projectile.vx);
     projectile=null; trail=[];
     checkRoundEnd();
     return;
   }
 
-  // ---- Fish hit check while projectile is already in water (missed surface) ----
-  if(projectile && _projWasInWater && inLakeX){
-    for(let fi=0;fi<fish.length;fi++){
-      const f=fish[fi];
-      if(f.stunTimer>0) continue;
-      const fx2=f.jumping?f.x+f.jumpX:f.x;
-      const fy2=f.jumping?f.y+f.jumpY:f.y;
-      const fdx=projectile.x-fx2, fdy=projectile.y-fy2;
-      const dist2D=Math.sqrt(fdx*fdx+fdy*fdy);
-      const fz=fishZ(fy2);
-      const zDiff=Math.abs(pZ-fz);
-      if(dist2D < f.size*1.8+projectile.r && zDiff < 1.5){
-        f.stunTimer=150; f.flipped=true;
-        f.vx=(fdx/Math.max(1,dist2D))*2+(Math.random()-0.5);
-        f.vy=-2.5-Math.random()*1.5;
-        spawnFishHit(fx2,fy2,f.color);
-      }
-    }
-  }
-
-  if(projectile && (projectile.x>canvas.width+20||projectile.x<-20||projectile.y>canvas.height+20)){
+  // Out of bounds check (use screen position)
+  if(psx>canvas.width+30||psx<-30||psy>canvas.height+30||projectile.z>Z_TARGETS+3){
     stopWhistle();
     projectile=null; trail=[];
     checkRoundEnd();
@@ -2448,61 +2470,79 @@ function updateProjectile(dt){
 }
 
 function drawProjectile(){
+  // Draw trail using projected positions
   for(let i=0;i<trail.length;i++){
-    const a=(i/trail.length)*0.55,r=4*(i/trail.length);
+    const a=(i/trail.length)*0.55;
+    const sc=trail[i].s||1;
+    const r=4*(i/trail.length)*sc;
     ctx.save();ctx.globalAlpha=a;ctx.fillStyle='#ffd700';
     ctx.beginPath();ctx.arc(trail[i].x,trail[i].y,r,0,Math.PI*2);ctx.fill();ctx.restore();
   }
   if(!projectile)return;
-  const pg=ctx.createRadialGradient(projectile.x-2,projectile.y-2,1,projectile.x,projectile.y,projectile.r);
+  // Project current projectile position to screen
+  const {sx,sy,scale} = proj3D(projectile.x, projectile.y, projectile.z);
+  const sr = projectile.r * scale;
+  const pg=ctx.createRadialGradient(sx-2*scale,sy-2*scale,1,sx,sy,Math.max(1,sr));
   pg.addColorStop(0,'#fff');pg.addColorStop(0.4,'#ffd700');pg.addColorStop(1,'#c8860a');
-  ctx.fillStyle=pg;ctx.strokeStyle='#8b6000';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.arc(projectile.x,projectile.y,projectile.r,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle=pg;ctx.strokeStyle='#8b6000';ctx.lineWidth=1.5*scale;
+  ctx.beginPath();ctx.arc(sx,sy,Math.max(2,sr),0,Math.PI*2);ctx.fill();ctx.stroke();
   ctx.save();ctx.globalAlpha=0.3;ctx.fillStyle='#ffd700';
-  ctx.beginPath();ctx.arc(projectile.x,projectile.y,projectile.r*2.2,0,Math.PI*2);ctx.fill();ctx.restore();
+  ctx.beginPath();ctx.arc(sx,sy,Math.max(2,sr)*2.2,0,Math.PI*2);ctx.fill();ctx.restore();
 }
 
 // ---- Aim line ----
 function drawAimLine(){
   if(projectile||gameOver||ammoLeft<=0)return;
-  // Use IDENTICAL physics to the real projectile (same dt=1/60, same speed formula)
   const minSpd=8, maxSpd=24;
-  const spd = minSpd + power*(maxSpd-minSpd); // EXACT same as fire()
-  const dt = 1/60; // match real game loop dt
-  const tipX=cannonBase.x+Math.cos(angle)*46;
-  const tipY=cannonBase.y+Math.sin(angle)*46;
-  let ax=tipX, ay=tipY;
-  let vx=Math.cos(angle)*spd, vy=Math.sin(angle)*spd;
-  const pts=[[ax,ay]];
-  // Simulate up to 600 frames (10 seconds) — enough to reach any target
+  const spd = minSpd + power*(maxSpd-minSpd);
+  const dt = 1/60;
+  const pitch = angle;
+  const hSpd = Math.cos(pitch)*spd;
+  const avx = hSpd*Math.cos(yaw);
+  const avy = Math.sin(pitch)*spd;
+  const avz = hSpd*Math.sin(yaw);
+  const tipX = cannonBase.x + Math.cos(pitch)*Math.cos(yaw)*46;
+  const tipY = cannonBase.y + Math.sin(pitch)*46;
+  let ax=tipX, ay=tipY, az=0.2;
+  let vx=avx, vy=avy, vz=avz;
+  const pts=[];
+  const waterSY = canvas.height*0.595;
   for(let i=0;i<600;i++){
-    vy += 9.8*dt;  // identical to updateProjectile
-    ax += vx;       // identical to updateProjectile
-    ay += vy;       // identical to updateProjectile
-    if(ax > canvas.width+160 || ay > canvas.height+40) break;
-    pts.push([ax,ay]);
-    // Also stop if projectile has clearly landed and moved far right
-    if(ay > canvas.height*0.95 && i > 60) break;
+    vy+=9.8*dt; ax+=vx; ay+=vy; az+=vz;
+    if(az<0) az=0;
+    const {sx,sy,scale}=proj3D(ax,ay,az);
+    if(sx>canvas.width+160||sy>canvas.height+40||az>Z_TARGETS+4) break;
+    pts.push({sx,sy,scale});
+    // Stop at water surface if in lake Z range
+    if(sy>=waterSY && sy<waterSY+16 && sx>canvas.width*0.22 && sx<canvas.width*0.72 && az>1.5 && vy>0) break;
+    if(sy>canvas.height*0.95 && i>60) break;
   }
   if(pts.length<2) return;
   ctx.save();
-  // Draw in 3 fading segments
   const seg=Math.ceil(pts.length/3);
   const segs=[
-    {pts:pts.slice(0,seg),        alpha:0.82},
-    {pts:pts.slice(seg,seg*2),    alpha:0.50},
-    {pts:pts.slice(seg*2),        alpha:0.26},
+    {arr:pts.slice(0,seg),       alpha:0.85},
+    {arr:pts.slice(seg,seg*2),   alpha:0.52},
+    {arr:pts.slice(seg*2),       alpha:0.28},
   ];
-  segs.forEach(({pts:sp,alpha})=>{
-    if(sp.length<2) return;
+  segs.forEach(({arr,alpha})=>{
+    if(arr.length<2) return;
     ctx.setLineDash([6,8]);
     ctx.lineWidth=2.5;
     ctx.strokeStyle=`rgba(255,225,80,${alpha})`;
     ctx.beginPath();
-    ctx.moveTo(sp[0][0],sp[0][1]);
-    sp.slice(1).forEach(([x,y])=>ctx.lineTo(x,y));
+    ctx.moveTo(arr[0].sx, arr[0].sy);
+    arr.slice(1).forEach(p=>ctx.lineTo(p.sx,p.sy));
     ctx.stroke();
   });
+  // Landing indicator dot
+  if(pts.length>1){
+    const last=pts[pts.length-1];
+    ctx.setLineDash([]);
+    ctx.globalAlpha=0.7;
+    ctx.fillStyle='rgba(255,200,50,0.7)';
+    ctx.beginPath();ctx.arc(last.sx,last.sy,5*last.scale,0,Math.PI*2);ctx.fill();
+  }
   ctx.setLineDash([]);
   ctx.restore();
 }
@@ -2601,7 +2641,7 @@ function doReset(){
   document.getElementById('reset-overlay').classList.remove('active');
   // Reset game state fully and go back to character select
   score=0;round=1;ammoLeft=cfg.ammoPerRound;
-  gameOver=false;projectile=null;trail=[];particles=[];power=0.5;hitPopupPending=false;
+  gameOver=false;projectile=null;trail=[];particles=[];power=0.5;yaw=0;hitPopupPending=false;
   document.getElementById('hit-popup-backdrop').classList.remove('active');
   document.getElementById('end-overlay').classList.remove('active');
   initTargets();updateHUD();
@@ -2703,7 +2743,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v5.2
+     A321 前進楓之國  v5.3
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
