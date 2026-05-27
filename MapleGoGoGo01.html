@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v4.4
+     版本：v4.5
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.4</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.5</div>
     </div>
   </div>
 </div>
@@ -523,21 +523,44 @@ function sfxCheer(){
 }
 function sfxCharge(pct){ if(Math.random()<0.15) playTone(200+pct*300,'sine',0.05,0.05); }
 function sfxBounce(){ playTone(200,'triangle',0.08,0.1,100); }
-function sfxWhistle(vy){
-  // Increasing frequency whistle as projectile falls faster
+// Persistent whistle node for falling bomb (U-shape howl)
+let _whistleOsc=null, _whistleGain=null;
+function startWhistle(){
   try{
+    if(_whistleOsc) return; // already playing
     const ac=getACtx();
-    const freq=Math.min(2000, 300+Math.abs(vy)*60);
-    const osc=ac.createOscillator();const g=ac.createGain();
-    osc.connect(g);g.connect(ac.destination);
-    osc.type='sawtooth';
-    osc.frequency.setValueAtTime(freq*0.5,ac.currentTime);
-    osc.frequency.linearRampToValueAtTime(freq,ac.currentTime+0.12);
-    g.gain.setValueAtTime(0.08,ac.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.13);
-    osc.start(ac.currentTime);osc.stop(ac.currentTime+0.13);
+    _whistleOsc=ac.createOscillator();
+    _whistleGain=ac.createGain();
+    _whistleOsc.connect(_whistleGain);_whistleGain.connect(ac.destination);
+    _whistleOsc.type='sine';
+    _whistleOsc.frequency.setValueAtTime(180, ac.currentTime);
+    _whistleGain.gain.setValueAtTime(0.0, ac.currentTime);
+    _whistleGain.gain.linearRampToValueAtTime(0.15, ac.currentTime+0.3);
+    _whistleOsc.start(ac.currentTime);
+  }catch(e){_whistleOsc=null;}
+}
+function updateWhistle(vy){
+  // vy > 0 means falling down; higher vy = faster fall = higher pitch
+  // "U" sound: pitch rises as fall accelerates (like "wooOOO")
+  try{
+    if(!_whistleOsc) startWhistle();
+    const ac=getACtx();
+    const speed=Math.abs(vy);
+    const freq=Math.max(120, Math.min(900, 120 + speed*28));
+    _whistleOsc.frequency.setTargetAtTime(freq, ac.currentTime, 0.08);
+    _whistleGain.gain.setTargetAtTime(0.18, ac.currentTime, 0.05);
   }catch(e){}
 }
+function stopWhistle(){
+  try{
+    if(!_whistleOsc) return;
+    const ac=getACtx();
+    _whistleGain.gain.setTargetAtTime(0.0, ac.currentTime, 0.15);
+    _whistleOsc.stop(ac.currentTime+0.5);
+    _whistleOsc=null; _whistleGain=null;
+  }catch(e){_whistleOsc=null;}
+}
+function sfxWhistle(vy){ updateWhistle(vy); }
 let _lastAngleSfx=0;
 function sfxAngleTick(){
   const now=performance.now();
@@ -1041,7 +1064,7 @@ function updateFish(dt){
       if(f.jumpY>=0 && !f.splashed){
         f.splashed=true;
         spawnSplash(f.x+f.jumpX, f.y);
-        sfxSplash();
+        // sfxSplash removed per user request
       }
       if(f.jumpY>canvas.height*0.05){
         f.jumping=false; f.splashed=false;
@@ -1312,6 +1335,7 @@ function fire() {
   const tipX=cannonBase.x+Math.cos(angle)*46;
   const tipY=cannonBase.y+Math.sin(angle)*46;
   projectile={x:tipX,y:tipY,vx:Math.cos(angle)*spd,vy:Math.sin(angle)*spd,r:8};
+  stopWhistle();
   _projWasAbove=false;
   trail=[];
   ammoLeft--;
@@ -1650,9 +1674,9 @@ function drawCloud(cx,cy,s){
 function drawCastle(){
   const cw=canvas.width, ch=canvas.height;
   // Scale factor — castle occupies left ~18% of canvas
-  const S = cw * 0.00155; // base scale unit — reduced height
+  const S = cw * 0.00118; // smaller scale so full castle fits
   const bx = cw * 0.005; // base left anchor
-  const by = ch * 0.64;  // ground line (lowered so castle top is visible)
+  const by = ch * 0.60;  // ground line
 
   ctx.save();
 
@@ -1769,11 +1793,24 @@ function drawCastle(){
   ctx.beginPath();ctx.arc(clkX,clkY,clkR,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='#6a5030';ctx.lineWidth=1.5;
   ctx.beginPath();ctx.arc(clkX,clkY,clkR,0,Math.PI*2);ctx.stroke();
-  // Clock hands
-  ctx.strokeStyle='#3a2010';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(clkX,clkY);ctx.lineTo(clkX+clkR*0.5,clkY-clkR*0.5);ctx.stroke();
-  ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.moveTo(clkX,clkY);ctx.lineTo(clkX-clkR*0.3,clkY-clkR*0.65);ctx.stroke();
+  // Clock hands — real time
+  const _now=new Date();
+  const _hr=_now.getHours()%12, _min=_now.getMinutes(), _sec=_now.getSeconds();
+  const _ha=(_hr/12 + _min/720)*Math.PI*2 - Math.PI/2;  // hour angle
+  const _ma=(_min/60 + _sec/3600)*Math.PI*2 - Math.PI/2; // minute angle
+  ctx.strokeStyle='#3a2010';ctx.lineWidth=Math.max(1.5, clkR*0.18);ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(clkX,clkY);
+  ctx.lineTo(clkX+Math.cos(_ha)*clkR*0.55, clkY+Math.sin(_ha)*clkR*0.55);ctx.stroke();
+  ctx.lineWidth=Math.max(1,clkR*0.12);
+  ctx.beginPath();ctx.moveTo(clkX,clkY);
+  ctx.lineTo(clkX+Math.cos(_ma)*clkR*0.78, clkY+Math.sin(_ma)*clkR*0.78);ctx.stroke();
+  // Second hand (thin red)
+  const _sa=(_sec/60)*Math.PI*2 - Math.PI/2;
+  ctx.strokeStyle='#c0392b';ctx.lineWidth=Math.max(0.8,clkR*0.07);
+  ctx.beginPath();ctx.moveTo(clkX,clkY);
+  ctx.lineTo(clkX+Math.cos(_sa)*clkR*0.85, clkY+Math.sin(_sa)*clkR*0.85);ctx.stroke();
+  // Centre dot
+  ctx.fillStyle='#3a2010';ctx.beginPath();ctx.arc(clkX,clkY,clkR*0.1,0,Math.PI*2);ctx.fill();
   // Tower tall windows
   [[0.35],[0.6],[0.82]].forEach(([fy])=>{
     ctx.fillStyle=window1;
@@ -2015,10 +2052,10 @@ function updateProjectile(dt){
   projectile.vy+=9.8*dt;
   projectile.x+=projectile.vx;
   projectile.y+=projectile.vy;
-  // Whistle when falling from above screen
+  // Whistle when falling back from above screen
   if(projectile.y<0){ _projWasAbove=true; }
-  if(_projWasAbove && projectile.y>0 && projectile.vy>0){
-    sfxWhistle(projectile.vy);
+  if(_projWasAbove && projectile.vy>0){
+    updateWhistle(projectile.vy); // continuous update as speed increases
   }
   for(const t of targets){
     if(t.hit)continue;
@@ -2028,6 +2065,7 @@ function updateProjectile(dt){
       t.hit=true;
       score+=t.pts;
       spawnHit(tx,ty,tierColor(t.pts));
+      stopWhistle();
       sfxHit(t.pts);
       showHitPopup(tx,ty,t.pts,t.charIdx);
       updateHUD();
@@ -2037,6 +2075,7 @@ function updateProjectile(dt){
     }
   }
   if(projectile.x>canvas.width+20||projectile.x<-20||projectile.y>canvas.height+20){
+    stopWhistle();
     projectile=null;trail=[];
     checkRoundEnd();
   }
@@ -2061,12 +2100,26 @@ function drawProjectile(){
 function drawAimLine(){
   if(projectile||gameOver||ammoLeft<=0)return;
   const spd=8+power*16;
-  let ax=cannonBase.x+Math.cos(angle)*48,ay=cannonBase.y+Math.sin(angle)*48;
-  let vx=Math.cos(angle)*spd,vy=Math.sin(angle)*spd;
-  ctx.save();ctx.setLineDash([4,9]);ctx.strokeStyle='rgba(255,220,80,0.38)';ctx.lineWidth=1.5;
+  let ax=cannonBase.x+Math.cos(angle)*48, ay=cannonBase.y+Math.sin(angle)*48;
+  let vx=Math.cos(angle)*spd, vy=Math.sin(angle)*spd;
+  ctx.save();
+  // Gradient dotted line: brighter near cannon, fades at end
+  ctx.setLineDash([5,8]);
+  ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(ax,ay);
-  for(let i=0;i<35;i++){vy+=9.8*0.05;ax+=vx;ay+=vy;if(ax>canvas.width||ay>canvas.height)break;ctx.lineTo(ax,ay);}
-  ctx.stroke();ctx.restore();
+  let prevAlpha=0.7;
+  for(let i=0;i<120;i++){  // many more steps to reach target zone
+    vy+=9.8*0.05; ax+=vx; ay+=vy;
+    // Stop only if past right edge or fallen below screen bottom
+    if(ax>canvas.width*1.05 || ay>canvas.height+20) break;
+    // Fade out progressively
+    const alpha=Math.max(0.05, 0.7*(1-i/120));
+    ctx.strokeStyle=`rgba(255,220,80,${alpha.toFixed(2)})`;
+    ctx.stroke();
+    ctx.beginPath();ctx.moveTo(ax,ay);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 // ---- Particles ----
@@ -2263,7 +2316,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v4.4
+     A321 前進楓之國  v4.5
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
