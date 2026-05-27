@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v4.5
+     版本：v4.6
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.5</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.6</div>
     </div>
   </div>
 </div>
@@ -401,7 +401,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">🐟 魚群設定</div>
     <div class="setting-row">
       <label>魚群游速</label>
-      <input type="range" id="set-fish-spd" min="0.2" max="3.0" step="0.1" value="0.6"
+      <input type="range" id="set-fish-spd" min="0.0" max="1.0" step="0.05" value="0.6"
         oninput="document.getElementById('set-fish-spd-val').textContent=parseFloat(this.value).toFixed(1)">
       <span class="setting-val" id="set-fish-spd-val">0.6</span>
     </div>
@@ -410,6 +410,12 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
       <input type="range" id="set-fish-cnt" min="0" max="30" step="1" value="12"
         oninput="document.getElementById('set-fish-cnt-val').textContent=this.value">
       <span class="setting-val" id="set-fish-cnt-val">12</span>
+    </div>
+    <div class="setting-row">
+      <label>魚跳間隔(秒)</label>
+      <input type="range" id="set-fish-jump" min="5" max="60" step="1" value="12"
+        oninput="document.getElementById('set-fish-jump-val').textContent=this.value">
+      <span class="setting-val" id="set-fish-jump-val">12</span>
     </div>
     <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">☁ 天空飄字（空白則不顯示）</div>
@@ -586,8 +592,9 @@ const cfg = {
   ammoPerRound: 10,
   totalRounds: 3,
   skyTexts: ['實動抽', '達標抽', '報聘抽2次', '排名抽', '', ''],  // 6 groups
-  fishSpeed: 0.6,  // default speed
+  fishSpeed: 0.6,  // default speed (0-1, step 0.05)
   fishCount: 12,
+  fishJumpSec: 12, // average seconds between jumps
 };
 
 // ===================== GOOGLE SHEETS =====================
@@ -852,8 +859,10 @@ function openSettings() {
     loadSkyTextUI();
     const fspd=document.getElementById('set-fish-spd');
     const fcnt=document.getElementById('set-fish-cnt');
-    if(fspd){fspd.value=cfg.fishSpeed;document.getElementById('set-fish-spd-val').textContent=cfg.fishSpeed.toFixed(1);}
+    if(fspd){fspd.value=cfg.fishSpeed;document.getElementById('set-fish-spd-val').textContent=cfg.fishSpeed.toFixed(2);}
     if(fcnt){fcnt.value=cfg.fishCount;document.getElementById('set-fish-cnt-val').textContent=cfg.fishCount;}
+    const fjmp=document.getElementById('set-fish-jump');
+    if(fjmp){fjmp.value=cfg.fishJumpSec;document.getElementById('set-fish-jump-val').textContent=cfg.fishJumpSec;}
     document.getElementById('settings-overlay').classList.add('active');
   });
 }
@@ -929,8 +938,10 @@ function applySettings() {
   });
   const fspd=document.getElementById('set-fish-spd');
   const fcnt=document.getElementById('set-fish-cnt');
-  if(fspd) cfg.fishSpeed=parseFloat(fspd.value)||1.0;
+  if(fspd) cfg.fishSpeed=Math.max(0,parseFloat(fspd.value)||0.6);
   if(fcnt) cfg.fishCount=parseInt(fcnt.value)||12;
+  const fjmp=document.getElementById('set-fish-jump');
+  if(fjmp) cfg.fishJumpSec=Math.max(5,parseInt(fjmp.value)||12);
   // Save sky texts
   cfg.skyTexts.forEach((_,i)=>{
     const el=document.getElementById('sky-txt-'+i);
@@ -1046,7 +1057,7 @@ function createFish(startRight){
     jumpVy: 0, jumpX: 0, jumpY: 0,
     splashed: false,
     // 10~20 seconds at ~60fps = 600~1200 frames
-    jumpTimer: 600+Math.random()*300,  // 10-15s at 60fps
+    jumpTimer: Math.round((cfg.fishJumpSec||12)*60*(0.85+Math.random()*0.3)),
   };
 }
 function updateFish(dt){
@@ -1069,7 +1080,7 @@ function updateFish(dt){
       if(f.jumpY>canvas.height*0.05){
         f.jumping=false; f.splashed=false;
         f.jumpX=0; f.jumpY=0;
-        f.jumpTimer=600+Math.random()*300; // 10-15s
+        f.jumpTimer=Math.round((cfg.fishJumpSec||12)*60*(0.85+Math.random()*0.3));
       }
     } else {
       const spd=(cfg.fishSpeed||1.0);
@@ -1085,7 +1096,7 @@ function updateFish(dt){
       if(f.jumpTimer<=0){
         f.jumping=true; f.splashed=false;
         f.jumpVy=-(6+Math.random()*4);
-        f.jumpTimer=600+Math.random()*300;
+        f.jumpTimer=Math.round((cfg.fishJumpSec||12)*60*(0.85+Math.random()*0.3));
       }
     }
   });
@@ -2100,25 +2111,36 @@ function drawProjectile(){
 function drawAimLine(){
   if(projectile||gameOver||ammoLeft<=0)return;
   const spd=8+power*16;
+  // Collect all arc points
+  const pts=[];
   let ax=cannonBase.x+Math.cos(angle)*48, ay=cannonBase.y+Math.sin(angle)*48;
   let vx=Math.cos(angle)*spd, vy=Math.sin(angle)*spd;
-  ctx.save();
-  // Gradient dotted line: brighter near cannon, fades at end
-  ctx.setLineDash([5,8]);
-  ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(ax,ay);
-  let prevAlpha=0.7;
-  for(let i=0;i<120;i++){  // many more steps to reach target zone
+  pts.push([ax,ay]);
+  for(let i=0;i<150;i++){
     vy+=9.8*0.05; ax+=vx; ay+=vy;
-    // Stop only if past right edge or fallen below screen bottom
-    if(ax>canvas.width*1.05 || ay>canvas.height+20) break;
-    // Fade out progressively
-    const alpha=Math.max(0.05, 0.7*(1-i/120));
-    ctx.strokeStyle=`rgba(255,220,80,${alpha.toFixed(2)})`;
-    ctx.stroke();
-    ctx.beginPath();ctx.moveTo(ax,ay);
+    if(ax>canvas.width+20 || ay>canvas.height+20) break;
+    pts.push([ax,ay]);
   }
-  ctx.stroke();
+  if(pts.length<2) return;
+  ctx.save();
+  // Draw in 3 fading segments for fade effect
+  const seg=Math.ceil(pts.length/3);
+  const segs=[
+    {pts:pts.slice(0,seg), alpha:0.75},
+    {pts:pts.slice(seg,seg*2), alpha:0.45},
+    {pts:pts.slice(seg*2), alpha:0.20},
+  ];
+  segs.forEach(({pts:sp,alpha})=>{
+    if(sp.length<2) return;
+    ctx.setLineDash([6,8]);
+    ctx.lineWidth=2.5;
+    ctx.strokeStyle=`rgba(255,225,80,${alpha})`;
+    ctx.beginPath();
+    ctx.moveTo(sp[0][0],sp[0][1]);
+    sp.slice(1).forEach(([x,y])=>ctx.lineTo(x,y));
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
@@ -2316,7 +2338,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v4.5
+     A321 前進楓之國  v4.6
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
