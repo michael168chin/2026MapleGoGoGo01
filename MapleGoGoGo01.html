@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v3.3
+     版本：v3.4
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -159,7 +159,10 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 .char-card:hover{border-color:var(--maple-yellow);background:rgba(255,215,0,0.08);}
 .char-card.selected{border-color:var(--maple-yellow);background:rgba(255,215,0,0.15);
   box-shadow:0 0 12px rgba(255,215,0,0.4);}
-.char-card canvas{display:block;margin:0 auto 3px;width:44px!important;height:52px!important;}
+.char-emoji{
+  display:flex;align-items:center;justify-content:center;
+  width:44px;height:52px;border-radius:8px;margin:0 auto 4px;
+}
 .char-card .char-name{font-size:.68rem;color:#ddd;font-weight:700;}
 #player-name-input{
   width:100%;padding:8px 12px;background:rgba(255,255,255,0.08);
@@ -706,57 +709,36 @@ function drawWeapon(ctx2, type, color) {
 }
 
 // ===================== BUILD CHARACTER SELECT =====================
+// Pure HTML/CSS — no canvas per card, works on all devices including old iOS
+const CHAR_EMOJIS = ['⚔️','🏹','🔮','🗡️','✨','🥷','🔫','🌟'];
+const CHAR_COLORS = ['#c0392b','#27ae60','#8e44ad','#2c3e50','#f39c12','#2c3e50','#e74c3c','#8e44ad'];
+
 function buildCharSelect() {
-  try {
-    const grid = document.getElementById('char-select-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    CHAR_DEFS.forEach((def, i) => {
-      try {
-        const card = document.createElement('div');
-        card.className = 'char-card' + (i===0?' selected':'');
-        card.onclick = () => {
-          document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
-          card.classList.add('selected');
-          selectedChar = i;
-        };
-        const c = document.createElement('canvas');
-        c.width = 44; c.height = 52;
-        const cx = c.getContext('2d');
-        try { drawCharSprite(cx, def, 18, 42, 0.9); } catch(e) {
-          // fallback: draw coloured circle if sprite fails
-          cx.fillStyle = def.clothColor||'#e67e22';
-          cx.beginPath(); cx.arc(22,26,18,0,Math.PI*2); cx.fill();
-          cx.fillStyle='#fff'; cx.font='10px sans-serif'; cx.textAlign='center';
-          cx.fillText(def.name||'?', 22, 30);
-        }
-        card.appendChild(c);
-        const nm = document.createElement('div');
-        nm.className = 'char-name';
-        nm.textContent = def.name;
-        card.appendChild(nm);
-        grid.appendChild(card);
-      } catch(e) { console.warn('char card error', i, e); }
-    });
-  } catch(e) { console.error('buildCharSelect error:', e); }
-  // Load existing players non-blocking — never block the UI
+  const grid = document.getElementById('char-select-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  CHAR_DEFS.forEach((def, i) => {
+    const card = document.createElement('div');
+    card.className = 'char-card' + (i===0?' selected':'');
+    card.onclick = () => {
+      document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');
+      selectedChar = i;
+    };
+    // Pure HTML sprite — no canvas, works everywhere
+    const emojiDiv = document.createElement('div');
+    emojiDiv.className = 'char-emoji';
+    emojiDiv.style.cssText = `background:${CHAR_COLORS[i]||'#555'};`;
+    emojiDiv.innerHTML = `<span style="font-size:1.6rem;line-height:1;">${CHAR_EMOJIS[i]||'👤'}</span>`;
+    const nm = document.createElement('div');
+    nm.className = 'char-name';
+    nm.textContent = def.name;
+    card.appendChild(emojiDiv);
+    card.appendChild(nm);
+    grid.appendChild(card);
+  });
+  // Load existing players non-blocking
   loadExistingPlayers().catch(()=>{});
-  // Failsafe: if grid still empty after 300ms (e.g. sprite draw failed), add text-only cards
-  setTimeout(()=>{
-    const g=document.getElementById('char-select-grid');
-    if(g && g.children.length===0){
-      CHAR_DEFS.forEach((def,i)=>{
-        const card=document.createElement('div');
-        card.className='char-card'+(i===0?' selected':'');
-        card.onclick=()=>{
-          document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
-          card.classList.add('selected'); selectedChar=i;
-        };
-        card.innerHTML=`<div style="font-size:1.4rem;margin:4px 0;">${['⚔️','🏹','🪄','🗡️','✨','🌀','🔫','🔮'][i]||'👤'}</div><div class="char-name">${def.name}</div>`;
-        g.appendChild(card);
-      });
-    }
-  }, 400);
 }
 
 async function loadExistingPlayers() {
@@ -954,7 +936,7 @@ function resizeCanvas() {
   canvas.width  = cw;
   canvas.height = ch;
   cannonBase.x = Math.round(cw * 0.055);
-  cannonBase.y = Math.round(ch - ch * 0.255);
+  cannonBase.y = Math.round(ch - ch * 0.25);
 }
 // Use logical constants that scale with canvas size
 let W = 900, H = 500;
@@ -967,7 +949,7 @@ let power = 0.5, angle = -Math.PI/4;
 let projectile = null, trail = [];
 let particles = [];
 
-let cannonBase = { x: 50, y: 422 }; // updated by resizeCanvas()
+let cannonBase = { x: 50, y: 375 }; // updated by resizeCanvas()
 
 // Target specs (mutable — editable via settings)
 let TARGET_SPECS = [
@@ -2354,7 +2336,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v3.3
+     A321 前進楓之國  v3.4
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
