@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v3.7
+     版本：v3.8
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -377,7 +377,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v3.7</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v3.8</div>
     </div>
   </div>
 </div>
@@ -1122,13 +1122,14 @@ function drawFish(){
       ctx.moveTo(-f.size*0.7,0);
       ctx.lineTo(-f.size*1.3,tailWag-f.size*0.35);
       ctx.lineTo(-f.size*1.3,tailWag+f.size*0.35);
-    ctx.closePath();ctx.fill();
-    // Fin
-    ctx.fillStyle='rgba(0,0,0,0.18)';
-    ctx.beginPath();ctx.ellipse(f.size*0.1,-f.size*0.4,f.size*0.3,f.size*0.18,0.4,0,Math.PI*2);ctx.fill();
-    // Eye
-    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(f.size*0.5,0,f.size*0.15,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#222';ctx.beginPath();ctx.arc(f.size*0.54,-f.size*0.02,f.size*0.08,0,Math.PI*2);ctx.fill();
+      ctx.closePath();ctx.fill();
+      // Fin
+      ctx.fillStyle='rgba(0,0,0,0.18)';
+      ctx.beginPath();ctx.ellipse(f.size*0.1,-f.size*0.4,f.size*0.3,f.size*0.18,0.4,0,Math.PI*2);ctx.fill();
+      // Eye
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(f.size*0.5,0,f.size*0.15,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#222';ctx.beginPath();ctx.arc(f.size*0.54,-f.size*0.02,f.size*0.08,0,Math.PI*2);ctx.fill();
+    } // end else (not jumping)
     ctx.restore();
   });
 }
@@ -2379,7 +2380,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v3.7
+     A321 前進楓之國  v3.8
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
