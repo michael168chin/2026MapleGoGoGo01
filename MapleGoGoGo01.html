@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v4.0
+     版本：v4.1
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -22,7 +22,7 @@
   --maple-green:#27ae60;--maple-blue:#2980b9;--maple-purple:#8e44ad;
   --ui-bg:rgba(10,20,40,0.92);--ui-border:#f1c40f;
 }
-body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;height:100vh;width:100vw;font-family:'Noto Sans TC',sans-serif;overflow:hidden;padding-top:0;}
+body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;height:100dvh;height:100vh;width:100vw;font-family:'Noto Sans TC',sans-serif;overflow:hidden;padding-top:0;}
 
 /* ========= TITLE ========= */
 #game-title{
@@ -377,7 +377,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.0</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.1</div>
     </div>
   </div>
 </div>
@@ -967,13 +967,16 @@ function resizeCanvas() {
   const titleH   = titleEl  ? titleEl.offsetHeight  + 8 : 36;
   const instrH   = instrEl  ? instrEl.offsetHeight  + 6 : 20;
   // HUD renders after canvas; estimate conservatively
-  const hudH     = 58;   // HUD bar
-  const padding  = 28;  // generous buffer for browser chrome / safe areas
+  const hudH     = 60;
+  // Use visualViewport height if available (accounts for iOS browser chrome)
+  const viewH = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  const padding  = 32;
   const safeTop  = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sat')||'0')||0;
-  const availH   = window.innerHeight - titleH - hudH - instrH - padding - safeTop;
+  const availH   = viewH - titleH - hudH - instrH - padding - safeTop;
   const availW   = document.getElementById('game-wrap').clientWidth;
-  // Fit ratio within both dimensions — use 9:4.5 (shorter) for iPad/mobile
-  const aspectH = window.innerWidth <= 1024 ? 450 : 500;
+  // Shorter aspect ratio on narrow/tablet screens
+  const isMobile = window.innerWidth <= 1100 || window.innerHeight <= 900;
+  const aspectH  = isMobile ? 430 : 500;
   let cw = availW;
   let ch = Math.round(cw * aspectH / 900);
   if (ch > availH) { ch = Math.max(availH, 80); cw = Math.round(ch * 900 / aspectH); }
@@ -1463,24 +1466,6 @@ function drawBackground(){
   // Wave helper: build wavy path from x0 to x1 at base y with amplitude amp
   // wavyShore: builds a shore edge that has funnel shape + waves
   // leftBank=true means the edge is the RIGHT side of left ground (faces water)
-  function shoreEdge(baseX, isLeft, shoreTopY, shoreAmp, waveFreq, wavePhase){
-    // funnel: top of shore leans MORE inward (narrow opening), bottom widens out further
-    const pts=[];
-    const totalH = ch - shoreTopY;
-    for(let y=shoreTopY; y<=ch+4; y+=3){
-      const frac=(y-shoreTopY)/totalH; // 0=top, 1=bottom
-      // At top: narrow (large inward shift); at bottom: wider (outward shift)
-      const inwardTop = cw*0.07*(1-frac)*(1-frac);   // strong inward lean at top
-      const outwardBot = cw*0.04*frac*frac;            // slight outward spread at bottom
-      const funnelInward = isLeft
-        ? inwardTop - outwardBot   // left shore
-        : -(inwardTop - outwardBot); // right shore (mirror)
-      const wave = Math.sin(y*waveFreq+wavePhase)*shoreAmp + Math.cos(y*waveFreq*0.7+wavePhase*1.4)*shoreAmp*0.35;
-      const x = baseX + funnelInward + wave;
-      pts.push([x, y]);
-    }
-    return pts;
-  }
   function wavyTop(x0, x1, baseY, amp, freq, phase){
     const pts=[];
     for(let x=x0;x<=x1+1;x+=3){
@@ -1491,33 +1476,36 @@ function drawBackground(){
   }
 
   const shoreY   = ch*0.590;
-  const amp      = ch*0.012;
-  const freq     = 0.045;
+  const amp      = ch*0.014;
   const leftX    = cw*0.20;
   const rightX   = cw*0.70;
 
-  const leftShore  = shoreEdge(leftX,  true,  shoreY, amp, 0.055, 0);
-  const rightShore = shoreEdge(rightX, false, shoreY, amp*0.9, 0.06, 1.5);
-
-  // ---- DRAW ORDER: river first (full rect), then grounds on top ----
-
-  // 1. River background rectangle (full span, no gaps)
-  const rv=ctx.createLinearGradient(leftX,0,rightX,0);
-  rv.addColorStop(0,'#1a4a8a');rv.addColorStop(0.25,'#1a6db5');rv.addColorStop(0.5,'#2980b9');rv.addColorStop(0.75,'#1a6db5');rv.addColorStop(1,'#1a4a8a');
-  ctx.fillStyle=rv;
-  ctx.fillRect(0, shoreY, cw, ch); // full width rect so no gaps
-
-  // River shimmer
-  ctx.strokeStyle='rgba(255,255,255,0.13)';ctx.lineWidth=1.2;
-  for(let ry=shoreY+amp*3;ry<ch;ry+=16){
-    ctx.beginPath();ctx.moveTo(leftX,ry);
-    for(let rx2=leftX;rx2<=rightX;rx2+=10){ctx.lineTo(rx2,ry+Math.sin((rx2+ry)*0.18)*2.5);}
-    ctx.stroke();
+  // Generate shore edge points as a simple wavy vertical line
+  // leftShore: points along the RIGHT edge of left ground (faces water)
+  // rightShore: points along the LEFT edge of right ground (faces water)
+  function buildShore(baseX, isLeft, waveAmp, freq, phase){
+    const pts=[];
+    for(let y=shoreY; y<=ch+4; y+=3){
+      const frac=(y-shoreY)/(ch-shoreY);
+      // Funnel: top leans inward, bottom stays near base
+      const funnel = isLeft
+        ? cw*0.05*(1-frac)*(1-frac)    // left shore leans right (into water) at top
+        : -cw*0.05*(1-frac)*(1-frac);  // right shore leans left (into water) at top
+      const wave = Math.sin(y*freq+phase)*waveAmp + Math.cos(y*freq*0.7+phase*1.3)*waveAmp*0.3;
+      pts.push([baseX + funnel + wave, y]);
+    }
+    return pts;
   }
-  ctx.save();ctx.globalAlpha=0.07;ctx.fillStyle='#fff';
-  ctx.fillRect(cw*0.42,shoreY+amp*3,cw*0.06,ch);ctx.restore();
+  const leftShore  = buildShore(leftX,  true,  amp, 0.055, 0);
+  const rightShore = buildShore(rightX, false, amp*0.85, 0.06, 1.5);
 
-  // 2. Left ground — drawn on top of river
+  // ---- DRAW ORDER: sky-colored base, then each region filled precisely ----
+
+  // 0. Fill whole lower area with sky blue as neutral base (clears any gaps)
+  ctx.fillStyle='#5b9bd5';
+  ctx.fillRect(0, shoreY, cw, ch);
+
+  // 1. Left ground — polygon: left edge → leftShore curve → bottom
   const gL=ctx.createLinearGradient(0,shoreY,0,ch);
   gL.addColorStop(0,'#3a6b2a');gL.addColorStop(0.1,'#2d5220');gL.addColorStop(0.28,'#4a3010');gL.addColorStop(1,'#2a1a08');
   ctx.fillStyle=gL;
@@ -1527,35 +1515,50 @@ function drawBackground(){
   leftShore.forEach(([x,y])=>ctx.lineTo(x,y));
   ctx.lineTo(leftShore[leftShore.length-1][0], ch);
   ctx.closePath(); ctx.fill();
-  // Left grass strip
-  ctx.fillStyle='#3a8c40';
-  ctx.beginPath();
-  leftShore.forEach(([x,y],i)=>{i===0?ctx.moveTo(x,y-4):ctx.lineTo(x,y-4);});
-  leftShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y+5));
-  ctx.closePath();ctx.fill();
 
-  // 3. Right ground — from rightShore edge rightward to canvas edge
-  //    Follow the shore curve exactly; fill right of it
+  // 2. Right ground — polygon: rightShore curve → right edge → bottom
   const gR=ctx.createLinearGradient(0,shoreY,0,ch);
   gR.addColorStop(0,'#3a6b2a');gR.addColorStop(0.1,'#2d5220');gR.addColorStop(0.28,'#4a3010');gR.addColorStop(1,'#2a1a08');
   ctx.fillStyle=gR;
   ctx.beginPath();
-  // Start at bottom-right corner
-  ctx.moveTo(cw, ch);
-  ctx.lineTo(cw, rightShore[rightShore.length-1][1]); // top-right at actual shore y
-  // Walk shore from bottom to top (rightShore is top→bottom, so reverse)
-  rightShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y));
-  // Close at bottom-left of right bank
-  ctx.lineTo(rightShore[0][0], ch);
+  ctx.moveTo(rightShore[0][0], shoreY);   // top of shore at shoreY
+  rightShore.forEach(([x,y])=>ctx.lineTo(x,y)); // walk shore top→bottom
+  ctx.lineTo(cw, ch);    // bottom-right
+  ctx.lineTo(cw, shoreY); // top-right
   ctx.closePath(); ctx.fill();
-  // Right grass strip — only along the shore edge
-  ctx.fillStyle='#3a8c40';
+
+  // 3. River — polygon between leftShore and rightShore
+  const rv=ctx.createLinearGradient(leftX,0,rightX,0);
+  rv.addColorStop(0,'#1a4a8a');rv.addColorStop(0.3,'#1a6db5');rv.addColorStop(0.5,'#2980b9');rv.addColorStop(0.7,'#1a6db5');rv.addColorStop(1,'#1a4a8a');
+  ctx.fillStyle=rv;
   ctx.beginPath();
-  rightShore.slice(0,Math.min(20,rightShore.length)).forEach(([x,y],i)=>{
-    i===0?ctx.moveTo(x,y-5):ctx.lineTo(x,y-5);
-  });
-  for(let i=Math.min(19,rightShore.length-1);i>=0;i--)
-    ctx.lineTo(rightShore[i][0],rightShore[i][1]+5);
+  leftShore.forEach(([x,y],i)=>{ i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+  ctx.lineTo(leftShore[leftShore.length-1][0], ch); // bottom-left of river
+  ctx.lineTo(rightShore[rightShore.length-1][0], ch); // bottom-right of river
+  rightShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y)); // up right shore
+  ctx.closePath(); ctx.fill();
+
+  // River shimmer
+  ctx.strokeStyle='rgba(255,255,255,0.13)';ctx.lineWidth=1.2;
+  for(let ry=shoreY+amp*2;ry<ch;ry+=16){
+    ctx.beginPath();ctx.moveTo(leftX,ry);
+    for(let rx2=leftX;rx2<=rightX;rx2+=10){ctx.lineTo(rx2,ry+Math.sin((rx2+ry)*0.18)*2.5);}
+    ctx.stroke();
+  }
+  ctx.save();ctx.globalAlpha=0.07;ctx.fillStyle='#fff';
+  ctx.fillRect(cw*0.42,shoreY+amp*2,cw*0.06,ch);ctx.restore();
+
+  // 4. Grass strips along shore edges
+  ctx.fillStyle='#3a8c40';
+  // Left grass
+  ctx.beginPath();
+  leftShore.forEach(([x,y],i)=>{i===0?ctx.moveTo(x,y-5):ctx.lineTo(x,y-5);});
+  leftShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y+5));
+  ctx.closePath();ctx.fill();
+  // Right grass
+  ctx.beginPath();
+  rightShore.forEach(([x,y],i)=>{i===0?ctx.moveTo(x,y-5):ctx.lineTo(x,y-5);});
+  rightShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y+5));
   ctx.closePath();ctx.fill();
 
   // ---- CASTLE ----
@@ -2373,6 +2376,11 @@ function initGame(){
   window.addEventListener('resize', () => {
     try { resizeCanvas(); initLeaves(); initFish(); } catch(e){}
   });
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', ()=>{
+      try { resizeCanvas(); } catch(e){}
+    });
+  }
 
   // Attach enter button listener (more reliable than inline onclick on iOS Safari)
   var enterBtn = document.getElementById('enter-btn');
@@ -2400,7 +2408,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v4.0
+     A321 前進楓之國  v4.1
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
