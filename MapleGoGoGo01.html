@@ -117,7 +117,8 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
   position:fixed;top:0;left:0;right:0;bottom:0;
   background:rgba(0,0,0,0.82);display:none;z-index:100;
   align-items:flex-start;justify-content:center;
-  overflow-y:auto;padding:16px 0;
+  overflow-y:auto;overflow-x:hidden;padding:12px 0;
+  -webkit-overflow-scrolling:touch;
 }
 .overlay.active{display:flex;}
 .panel{
@@ -126,6 +127,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
   padding:20px 22px;color:#fff;max-width:520px;width:95%;
   box-shadow:0 0 60px rgba(192,57,43,0.5);
   margin:auto;flex-shrink:0;
+  box-sizing:border-box;
 }
 .panel h2{color:var(--maple-yellow);font-size:1.4rem;margin-bottom:12px;text-align:center;text-shadow:0 0 10px #e67e22;}
 .panel-btn{
@@ -139,6 +141,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 
 /* ========= CHARACTER SELECT ========= */
 #char-select-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0;}
+#char-overlay .panel{max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .char-card{
   border:2.5px solid #444;border-radius:10px;padding:6px 3px 5px;
   cursor:pointer;text-align:center;transition:all .2s;
@@ -377,6 +380,24 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 </div>
 
 <script>
+// ===================== POLYFILLS =====================
+// roundRect not available on older Safari/iOS — add polyfill
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    if (w < 2*r) r = w/2;
+    if (h < 2*r) r = h/2;
+    r = Math.max(0, r);
+    this.beginPath();
+    this.moveTo(x+r, y);
+    this.arcTo(x+w, y,   x+w, y+h, r);
+    this.arcTo(x+w, y+h, x,   y+h, r);
+    this.arcTo(x,   y+h, x,   y,   r);
+    this.arcTo(x,   y,   x+w, y,   r);
+    this.closePath();
+    return this;
+  };
+}
+
 // ===================== SOUND =====================
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
 let _actx = null;
@@ -646,49 +667,85 @@ function drawWeapon(ctx2, type, color) {
 
 // ===================== BUILD CHARACTER SELECT =====================
 function buildCharSelect() {
-  const grid = document.getElementById('char-select-grid');
-  grid.innerHTML = '';
-  CHAR_DEFS.forEach((def, i) => {
-    const card = document.createElement('div');
-    card.className = 'char-card' + (i===0?' selected':'');
-    card.onclick = () => {
-      document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
-      card.classList.add('selected');
-      selectedChar = i;
-    };
-    const c = document.createElement('canvas');
-    c.width = 44; c.height = 52;
-    const cx = c.getContext('2d');
-    drawCharSprite(cx, def, 18, 42, 0.9);
-    card.appendChild(c);
-    const nm = document.createElement('div');
-    nm.className = 'char-name';
-    nm.textContent = def.name;
-    card.appendChild(nm);
-    grid.appendChild(card);
-  });
-  // Try loading existing players from Google Sheets
-  loadExistingPlayers();
+  try {
+    const grid = document.getElementById('char-select-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    CHAR_DEFS.forEach((def, i) => {
+      try {
+        const card = document.createElement('div');
+        card.className = 'char-card' + (i===0?' selected':'');
+        card.onclick = () => {
+          document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+          card.classList.add('selected');
+          selectedChar = i;
+        };
+        const c = document.createElement('canvas');
+        c.width = 44; c.height = 52;
+        const cx = c.getContext('2d');
+        try { drawCharSprite(cx, def, 18, 42, 0.9); } catch(e) {
+          // fallback: draw coloured circle if sprite fails
+          cx.fillStyle = def.clothColor||'#e67e22';
+          cx.beginPath(); cx.arc(22,26,18,0,Math.PI*2); cx.fill();
+          cx.fillStyle='#fff'; cx.font='10px sans-serif'; cx.textAlign='center';
+          cx.fillText(def.name||'?', 22, 30);
+        }
+        card.appendChild(c);
+        const nm = document.createElement('div');
+        nm.className = 'char-name';
+        nm.textContent = def.name;
+        card.appendChild(nm);
+        grid.appendChild(card);
+      } catch(e) { console.warn('char card error', i, e); }
+    });
+  } catch(e) { console.error('buildCharSelect error:', e); }
+  // Load existing players non-blocking — never block the UI
+  loadExistingPlayers().catch(()=>{});
+  // Failsafe: if grid still empty after 300ms (e.g. sprite draw failed), add text-only cards
+  setTimeout(()=>{
+    const g=document.getElementById('char-select-grid');
+    if(g && g.children.length===0){
+      CHAR_DEFS.forEach((def,i)=>{
+        const card=document.createElement('div');
+        card.className='char-card'+(i===0?' selected':'');
+        card.onclick=()=>{
+          document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+          card.classList.add('selected'); selectedChar=i;
+        };
+        card.innerHTML=`<div style="font-size:1.4rem;margin:4px 0;">${['⚔️','🏹','🪄','🗡️','✨','🌀','🔫','🔮'][i]||'👤'}</div><div class="char-name">${def.name}</div>`;
+        g.appendChild(card);
+      });
+    }
+  }, 400);
 }
 
 async function loadExistingPlayers() {
-  const section = document.getElementById('existing-players-section');
-  const select = document.getElementById('existing-players-select');
-  if (!APPS_SCRIPT_URL) { section.style.display='none'; return; }
-  const players = await gsLoadPlayers();
-  if (!players.length) { section.style.display='none'; return; }
-  section.style.display='block';
-  select.innerHTML = '<option value="">── 選擇已有玩家 ──</option>';
-  players.forEach((p,i) => {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = `${p.name}（${p.character}）`;
-    opt.dataset.name = p.name;
-    opt.dataset.char = p.character;
-    select.appendChild(opt);
-  });
-  // Store for lookup
-  select._players = players;
+  try {
+    const section = document.getElementById('existing-players-section');
+    const select = document.getElementById('existing-players-select');
+    if (!section || !select) return;
+    if (!APPS_SCRIPT_URL) { section.style.display='none'; return; }
+    let players = [];
+    try { players = await gsLoadPlayers(); } catch(e) { players = []; }
+    if (!players || !players.length) { section.style.display='none'; return; }
+    section.style.display='block';
+    select.innerHTML = '<option value="">── 選擇已有玩家 ──</option>';
+    players.forEach((p,i) => {
+      try {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = `${p.name}（${p.character}）`;
+        opt.dataset.name = p.name;
+        opt.dataset.char = p.character;
+        select.appendChild(opt);
+      } catch(e){}
+    });
+    select._players = players;
+  } catch(e) {
+    console.warn('loadExistingPlayers error:', e);
+    const section = document.getElementById('existing-players-section');
+    if(section) section.style.display='none';
+  }
 }
 
 function applyExistingPlayer() {
@@ -707,13 +764,23 @@ function applyExistingPlayer() {
 }
 
 async function confirmChar() {
-  const nm = document.getElementById('player-name-input').value.trim();
-  playerName = nm || '冒險者';
-  myCharDef = CHAR_DEFS[selectedChar];
-  document.getElementById('player-display').textContent = playerName;
-  document.getElementById('char-overlay').classList.remove('active');
-  // Write to Google Sheets (non-blocking)
-  gsRegisterPlayer(playerName, myCharDef.name);
+  try {
+    const nmEl = document.getElementById('player-name-input');
+    const nm = nmEl ? nmEl.value.trim() : '';
+    playerName = nm || '冒險者';
+    myCharDef = CHAR_DEFS[selectedChar] || CHAR_DEFS[0];
+    const pdEl = document.getElementById('player-display');
+    if(pdEl) pdEl.textContent = playerName;
+    const ovEl = document.getElementById('char-overlay');
+    if(ovEl) ovEl.classList.remove('active');
+    // Write to Google Sheets (non-blocking, never throw)
+    gsRegisterPlayer(playerName, myCharDef.name).catch(()=>{});
+  } catch(e) {
+    console.warn('confirmChar error:', e);
+    // Fallback: just close overlay
+    const ovEl = document.getElementById('char-overlay');
+    if(ovEl) ovEl.classList.remove('active');
+  }
 }
 
 // ===================== SETTINGS =====================
@@ -933,8 +1000,8 @@ function renderAmmoBar() {
 function updateHUD() {
   document.getElementById('score-display').textContent=score;
   document.getElementById('round-display').textContent=`${round}/${cfg.totalRounds}`;
-  const deg = Math.round((-angle)*180/Math.PI);
-  document.getElementById('angle-display').textContent=deg+'°';
+  const degDisp = Math.round(-angle * 180/Math.PI);
+  document.getElementById('angle-display').textContent=degDisp+'°';
   const pct=Math.round(power*100);
   document.getElementById('power-display').textContent=pct+'%';
   document.getElementById('power-bar-fill').style.width=pct+'%';
@@ -945,8 +1012,13 @@ function updateHUD() {
 function updateAngle(mx,my) {
   const dx=mx-cannonBase.x, dy=my-cannonBase.y;
   angle=Math.atan2(dy,dx);
-  angle=Math.max(angle,-Math.PI+0.08);
-  angle=Math.min(angle,-0.04);
+  // Clamp: max = -PI/2 (90° straight up), min = PI/12 (15° below horizon)
+  const AMAX = -Math.PI/2;   // 90° up
+  const AMIN = Math.PI/12;   // -15° (slightly downward)
+  if(angle < AMAX) angle = AMAX;
+  if(angle > AMIN) angle = AMIN;
+  // Also disallow pointing right (past 0) or backward
+  if(angle > AMIN) angle = AMIN;
 }
 let _prevAngle=angle;
 canvas.addEventListener('mousemove',e=>{
@@ -1883,17 +1955,9 @@ function gameLoop(ts){
   const valLbl = document.getElementById('angle-slider-val');
   if(!track) return;
 
-  // Angle range: top=90° straight up, bottom=-30° (below horizon)
-  // In canvas coords: angle from positive X axis; up=-90°= -PI/2
-  const ANGLE_MIN = -Math.PI * 1.0;   // slider TOP = 180° (pointing left, max up = -PI/2)
-  // Actually: top of slider = angle pointing most upward = -PI/2 (-90°)
-  //           bottom of slider = -30° = -PI/6
-  // frac=0(top) → angle=-PI/2 (90° up); frac=1(bottom) → angle=-PI/6 (-30° ish below horiz)
-  const ANGLE_TOP = -Math.PI / 2;        // 90° straight up
-  const ANGLE_BOTTOM = -Math.PI / 6;     // 30° above horizon (not below horiz per request)
-  // Redefine ANGLE_MIN/MAX for fracToAngle
-  const ANGLE_MIN = ANGLE_TOP;
-  const ANGLE_MAX = ANGLE_BOTTOM;
+  // Slider: TOP = 90° (straight up) = -PI/2; BOTTOM = -15° (slightly down) = +PI/12
+  const ANGLE_MIN = -Math.PI / 2;   // slider top = 90° up
+  const ANGLE_MAX = Math.PI / 12;   // slider bottom = -15° (15° below horizontal)
 
   let dragging = false;
   let sliderY = 0.5; // 0=top(low angle) 1=bottom(high angle)
@@ -2009,22 +2073,30 @@ function gameLoop(ts){
 })();
 
 // ---- Init ----
-resizeCanvas();
-window.addEventListener('resize', () => {
-  resizeCanvas();
-  initLeaves(); // re-scatter leaves for new size
-});
-buildCharSelect();
-initTargets();
-initLeaves();
-updateHUD();
-requestAnimationFrame(ts=>{lastTime=ts;gameLoop(ts);});
+function initGame(){
+  try { resizeCanvas(); } catch(e){ console.warn('resizeCanvas err',e); }
+  window.addEventListener('resize', () => {
+    try { resizeCanvas(); initLeaves(); } catch(e){}
+  });
+  try { buildCharSelect(); } catch(e){ console.error('buildCharSelect err',e); }
+  try { initTargets(); } catch(e){ console.warn('initTargets err',e); }
+  try { initLeaves(); } catch(e){ console.warn('initLeaves err',e); }
+  try { updateHUD(); } catch(e){ console.warn('updateHUD err',e); }
+  requestAnimationFrame(ts=>{lastTime=ts;gameLoop(ts);});
+}
+// Ensure DOM is fully ready before initialising
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', initGame);
+} else {
+  initGame();
+}
 </script>
 </body>
 </html>
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v2.0
+     A321 前進楓之國  v3.1
+     更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
