@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v3.1
+     版本：v3.2
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -12,6 +12,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<style>:root{--sat:env(safe-area-inset-top,0px);}</style>
 <title>A321 前進楓之國</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
@@ -75,6 +76,14 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 @media (max-height:700px){#instructions{display:none;}}
 @media (max-width:820px){
   #game-title{font-size:clamp(.7rem,3.5vw,1.1rem);letter-spacing:1px;}
+}
+@media (max-height:820px){
+  #game-title{font-size:clamp(.65rem,2.5vh,1rem);margin-bottom:2px;}
+  #hud{padding:3px 8px;font-size:clamp(.58rem,1.1vw,.8rem);}
+  #instructions{display:none;}
+}
+@media (max-height:640px){
+  #game-title{font-size:.65rem;margin-bottom:1px;letter-spacing:.5px;}
 }
 #hud{font-size:clamp(.65rem,1.2vw,.9rem);padding:clamp(4px,0.8vw,8px) clamp(8px,1.5vw,16px);gap:clamp(4px,0.8vw,10px);}
 .hud-val{font-size:clamp(.8rem,1.4vw,1.1rem);}
@@ -467,6 +476,21 @@ function sfxCheer(){
 }
 function sfxCharge(pct){ if(Math.random()<0.15) playTone(200+pct*300,'sine',0.05,0.05); }
 function sfxBounce(){ playTone(200,'triangle',0.08,0.1,100); }
+function sfxWhistle(vy){
+  // Increasing frequency whistle as projectile falls faster
+  try{
+    const ac=getACtx();
+    const freq=Math.min(2000, 300+Math.abs(vy)*60);
+    const osc=ac.createOscillator();const g=ac.createGain();
+    osc.connect(g);g.connect(ac.destination);
+    osc.type='sawtooth';
+    osc.frequency.setValueAtTime(freq*0.5,ac.currentTime);
+    osc.frequency.linearRampToValueAtTime(freq,ac.currentTime+0.12);
+    g.gain.setValueAtTime(0.08,ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.13);
+    osc.start(ac.currentTime);osc.stop(ac.currentTime+0.13);
+  }catch(e){}
+}
 let _lastAngleSfx=0;
 function sfxAngleTick(){
   const now=performance.now();
@@ -491,7 +515,7 @@ const cfg = {
   speedMult: 2.5,
   ammoPerRound: 10,
   totalRounds: 3,
-  skyTexts: ['實動抽', '達標抽', '報聘抽', '報聘抽', '排名抽', '', ''],
+  skyTexts: ['實動抽', '達標抽', '報聘抽二次', '報聘抽', '排名抽', ''],  // 6 groups
 };
 
 // ===================== GOOGLE SHEETS =====================
@@ -831,7 +855,7 @@ function loadSkyTextUI(){
   const cont=document.getElementById('sky-text-rows');
   if(!cont) return;
   cont.innerHTML='';
-  cfg.skyTexts.forEach((txt,i)=>{
+  cfg.skyTexts.slice(0,6).forEach((txt,i)=>{
     const row=document.createElement('div');
     row.className='setting-row';row.style.gap='8px';
     row.innerHTML=`<label style="min-width:36px;">第${i+1}組</label>
@@ -894,9 +918,10 @@ function resizeCanvas() {
   const titleH   = titleEl  ? titleEl.offsetHeight  + 8 : 36;
   const instrH   = instrEl  ? instrEl.offsetHeight  + 6 : 20;
   // HUD renders after canvas; estimate conservatively
-  const hudH     = 44;
-  const padding  = 8; // small buffer
-  const availH   = window.innerHeight - titleH - hudH - instrH - padding;
+  const hudH     = 52;   // HUD bar
+  const padding  = 18;  // generous buffer for browser chrome / safe areas
+  const safeTop  = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sat')||'0')||0;
+  const availH   = window.innerHeight - titleH - hudH - instrH - padding - safeTop;
   const availW   = document.getElementById('game-wrap').clientWidth;
   // Fit 9:5 ratio within both dimensions
   let cw = availW;
@@ -942,6 +967,136 @@ let targets = [];
 
 // ---- Maple leaf particles (Canada atmosphere) ----
 let leaves = [];
+// ---- Fish ----
+let fish = [];
+function initFish(){
+  fish=[];
+  for(let i=0;i<12;i++){
+    fish.push(createFish());
+  }
+}
+function createFish(startRight){
+  const cw=canvas.width||900, ch=canvas.height||500;
+  const riverL=cw*0.22, riverR=cw*0.68;
+  const waterTop=ch*0.62, waterBot=ch*0.92;
+  const goRight=startRight!==undefined?startRight:(Math.random()>0.5);
+  return {
+    x: goRight ? riverL : riverR,
+    y: waterTop + Math.random()*(waterBot-waterTop)*0.7,
+    vx: goRight?(1.2+Math.random()*1.8):(-(1.2+Math.random()*1.8)),
+    vy: (Math.random()-0.5)*0.4,
+    size: 8+Math.random()*14,
+    color: ['#e87820','#f0a030','#c06010','#e0c860','#80b8d0','#f05050'][~~(Math.random()*6)],
+    tailPhase: Math.random()*Math.PI*2,
+    jumping: false,
+    jumpVy: 0,
+    jumpX: 0, jumpY: 0,
+    splashed: false,
+    jumpTimer: 20+Math.random()*300, // frames until next jump attempt
+  };
+}
+function updateFish(dt){
+  const cw=canvas.width, ch=canvas.height;
+  const riverL=cw*0.21, riverR=cw*0.69;
+  const waterTop=ch*0.59, waterBot=ch*0.96;
+  fish.forEach((f,fi)=>{
+    f.tailPhase+=dt*8;
+    if(f.jumping){
+      f.jumpVy+=18*dt; // gravity
+      f.jumpX+=f.vx*dt*18;
+      f.jumpY+=f.jumpVy*dt*18;
+      // Splash on return
+      if(f.jumpY>=0 && !f.splashed){
+        f.splashed=true;
+        spawnSplash(f.x+f.jumpX, f.y);
+        sfxSplash();
+      }
+      if(f.jumpY>30){
+        f.jumping=false; f.splashed=false;
+        f.jumpX=0; f.jumpY=0;
+        f.jumpTimer=60+Math.random()*400;
+      }
+    } else {
+      f.x+=f.vx;
+      f.y+=f.vy;
+      f.vy+=(Math.random()-0.5)*0.12;
+      f.vy=Math.max(-0.8,Math.min(0.8,f.vy));
+      // Keep in river bounds
+      if(f.y<waterTop+f.size){f.y=waterTop+f.size;f.vy=Math.abs(f.vy);}
+      if(f.y>waterBot-f.size){f.y=waterBot-f.size;f.vy=-Math.abs(f.vy);}
+      // Wrap horizontally
+      if(f.x>riverR+20) fish[fi]=createFish(false);
+      if(f.x<riverL-20) fish[fi]=createFish(true);
+      // Jump trigger
+      f.jumpTimer--;
+      if(f.jumpTimer<=0 && Math.random()<0.015){
+        f.jumping=true;
+        f.splashed=false;
+        f.jumpVy=-(8+Math.random()*5);
+        f.jumpTimer=80+Math.random()*300;
+      }
+    }
+  });
+}
+function drawFish(){
+  fish.forEach(f=>{
+    const fx= f.jumping ? f.x+f.jumpX : f.x;
+    const fy= f.jumping ? f.y+f.jumpY : f.y;
+    const flip=f.vx<0;
+    ctx.save();
+    ctx.translate(fx,fy);
+    if(flip) ctx.scale(-1,1);
+    // Body
+    const tailWag=Math.sin(f.tailPhase)*f.size*0.28;
+    ctx.fillStyle=f.color;
+    ctx.beginPath();
+    ctx.ellipse(0,0,f.size,f.size*0.42,0,0,Math.PI*2);
+    ctx.fill();
+    // Tail
+    ctx.fillStyle=f.color;
+    ctx.beginPath();
+    ctx.moveTo(-f.size*0.7,0);
+    ctx.lineTo(-f.size*1.3,tailWag-f.size*0.35);
+    ctx.lineTo(-f.size*1.3,tailWag+f.size*0.35);
+    ctx.closePath();ctx.fill();
+    // Fin
+    ctx.fillStyle='rgba(0,0,0,0.18)';
+    ctx.beginPath();ctx.ellipse(f.size*0.1,-f.size*0.4,f.size*0.3,f.size*0.18,0.4,0,Math.PI*2);ctx.fill();
+    // Eye
+    ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(f.size*0.5,0,f.size*0.15,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#222';ctx.beginPath();ctx.arc(f.size*0.54,-f.size*0.02,f.size*0.08,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  });
+}
+function spawnSplash(x,y){
+  for(let i=0;i<14;i++){
+    const a=-Math.PI/2+(Math.random()-0.5)*Math.PI*0.9;
+    const spd=2+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,
+      life:1,decay:0.055+Math.random()*0.04,r:2+Math.random()*4,
+      color:'rgba(160,210,240,0.85)',grav:0.22});
+  }
+}
+function sfxSplash(){
+  try{
+    const ac=getACtx();
+    // White noise burst (water)
+    const buf=ac.createBuffer(1,ac.sampleRate*0.18,ac.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/ac.sampleRate*18);
+    const src=ac.createBufferSource();
+    const lpf=ac.createBiquadFilter();lpf.type='lowpass';lpf.frequency.value=2200;
+    const g=ac.createGain();
+    src.buffer=buf;
+    src.connect(lpf);lpf.connect(g);g.connect(ac.destination);
+    g.gain.setValueAtTime(0.28,ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ac.currentTime+0.18);
+    src.start();src.stop(ac.currentTime+0.2);
+    // Plop tone
+    playTone(320,'sine',0.1,0.2,180);
+  }catch(e){}
+}
+
 function initLeaves() {
   leaves = [];
   for(let i=0;i<18;i++) {
@@ -1036,15 +1191,28 @@ canvas.addEventListener('mouseup',e=>{
   if(e.button!==0||!charging||projectile||ammoLeft<=0||hitPopupPending)return;
   charging=false; fire();
 });
+// On touch devices: canvas touch ONLY adjusts angle (no accidental firing)
+// Firing is controlled exclusively via the angle slider hold mechanism
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
-  const r=canvas.getBoundingClientRect(),sc=W/r.width,t=e.touches[0];
+  if(hitPopupPending||gameOver) return;
+  const r=canvas.getBoundingClientRect(),sc=canvas.width/r.width,t=e.touches[0];
   updateAngle((t.clientX-r.left)*sc,(t.clientY-r.top)*sc);
-  if(!projectile&&!gameOver&&ammoLeft>0&&!hitPopupPending){charging=true;chargeStart=performance.now();}
+  updateHUD();
+  if(window._syncAngleSlider) _syncAngleSlider();
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(hitPopupPending||gameOver) return;
+  const r=canvas.getBoundingClientRect(),sc=canvas.width/r.width,t=e.touches[0];
+  updateAngle((t.clientX-r.left)*sc,(t.clientY-r.top)*sc);
+  updateHUD();
+  if(window._syncAngleSlider) _syncAngleSlider();
+  if(Math.abs(angle-_prevAngle)>0.02){sfxAngleTick();_prevAngle=angle;}
 },{passive:false});
 canvas.addEventListener('touchend',e=>{
   e.preventDefault();
-  if(charging&&!projectile&&ammoLeft>0&&!hitPopupPending){charging=false;fire();}
+  // No firing from canvas touch — use slider
 },{passive:false});
 
 function fire() {
@@ -1053,6 +1221,7 @@ function fire() {
   const tipX=cannonBase.x+Math.cos(angle)*46;
   const tipY=cannonBase.y+Math.sin(angle)*46;
   projectile={x:tipX,y:tipY,vx:Math.cos(angle)*spd,vy:Math.sin(angle)*spd,r:8};
+  _projWasAbove=false;
   trail=[];
   ammoLeft--;
   power=0.5;
@@ -1195,17 +1364,17 @@ function drawBackground(){
   // wavyShore: builds a shore edge that has funnel shape + waves
   // leftBank=true means the edge is the RIGHT side of left ground (faces water)
   function shoreEdge(baseX, isLeft, shoreTopY, shoreAmp, waveFreq, wavePhase){
-    // funnel: top of shore leans inward, bottom widens out
-    // For left shore: x = baseX + inward_offset - outward_curve + wave
-    // For right shore: mirror
+    // funnel: top of shore leans MORE inward (narrow opening), bottom widens out further
     const pts=[];
     const totalH = ch - shoreTopY;
     for(let y=shoreTopY; y<=ch+4; y+=3){
       const frac=(y-shoreTopY)/totalH; // 0=top, 1=bottom
-      // Funnel offset: at top, shore leans inward by ~4%; at bottom, back to 0
+      // At top: narrow (large inward shift); at bottom: wider (outward shift)
+      const inwardTop = cw*0.07*(1-frac)*(1-frac);   // strong inward lean at top
+      const outwardBot = cw*0.04*frac*frac;            // slight outward spread at bottom
       const funnelInward = isLeft
-        ? cw*0.04*(1-frac)*(1-frac)   // left: positive = shifts right (inward)
-        : -cw*0.04*(1-frac)*(1-frac); // right: negative = shifts left (inward)
+        ? inwardTop - outwardBot   // left shore
+        : -(inwardTop - outwardBot); // right shore (mirror)
       const wave = Math.sin(y*waveFreq+wavePhase)*shoreAmp + Math.cos(y*waveFreq*0.7+wavePhase*1.4)*shoreAmp*0.35;
       const x = baseX + funnelInward + wave;
       pts.push([x, y]);
@@ -1274,24 +1443,26 @@ function drawBackground(){
   ctx.save();ctx.globalAlpha=0.08;ctx.fillStyle='#fff';
   ctx.fillRect(cw*0.42,shoreY+amp*2,cw*0.06,ch);ctx.restore();
 
-  // Right ground
-  const gR=ctx.createLinearGradient(0,shoreY-amp,0,ch);
+  // Right ground — correct gradient (vertical, top to bottom)
+  const gR=ctx.createLinearGradient(0,shoreY,0,ch);
   gR.addColorStop(0,'#3a6b2a');gR.addColorStop(0.08,'#2d5220');gR.addColorStop(0.25,'#4a3010');gR.addColorStop(1,'#2a1a08');
   ctx.fillStyle=gR;
   ctx.beginPath();
   ctx.moveTo(cw, ch);
-  ctx.lineTo(cw, shoreY);
+  ctx.lineTo(cw, shoreY-ch*0.01);
   rightShore.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y));
   ctx.lineTo(rightShore[0][0], ch);
   ctx.closePath(); ctx.fill();
 
-  // Green grass right shore edge
+  // Green grass right shore
   ctx.fillStyle='#3a8c40';
-  const rsLen=rightShore.length;
-  ctx.beginPath();
-  rightShore.slice(rsLen-8).forEach(([x,y],i)=>{ i===0?ctx.moveTo(x,y-4):ctx.lineTo(x,y-4); });
-  for(let i=7;i>=0;i--) ctx.lineTo(rightShore[rsLen-8+i][0], rightShore[rsLen-8+i][1]+5);
-  ctx.closePath(); ctx.fill();
+  const rsTop=rightShore.filter(([x,y])=>y<shoreY+amp*2);
+  if(rsTop.length>1){
+    ctx.beginPath();
+    rsTop.forEach(([x,y],i)=>{i===0?ctx.moveTo(x,y-3):ctx.lineTo(x,y-3);});
+    rsTop.slice().reverse().forEach(([x,y])=>ctx.lineTo(x,y+6));
+    ctx.closePath();ctx.fill();
+  }
 
   // ---- CASTLE ----
   drawCastle();
@@ -1339,13 +1510,17 @@ function drawBackground(){
     const phase=i*1.8;
     const tx=cw*(0.08+i*0.14) + Math.sin(now*0.18+phase)*cw*0.025;
     const ty=ch*(0.08+Math.sin(now*0.12+phase*0.7)*0.04) + i%2*ch*0.05;
-    const alpha=0.22+Math.sin(now*0.4+phase)*0.08;
+    const alpha=0.45+Math.sin(now*0.4+phase)*0.08; // fixed alpha visible in both browsers
+    const fs=Math.round(cw*0.022);
     ctx.save();
     ctx.globalAlpha=alpha;
-    ctx.font=`bold ${Math.round(cw*0.022)}px Noto Sans TC`;
+    ctx.font=`900 ${fs}px Noto Sans TC, sans-serif`;
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillStyle='#ffffff';
-    ctx.shadowColor='rgba(100,160,255,0.6)';ctx.shadowBlur=8;
+    // Draw outline for readability (works in both Chrome & Safari)
+    ctx.strokeStyle='rgba(0,60,120,0.55)';
+    ctx.lineWidth=Math.max(3, fs*0.15);
+    ctx.strokeText(txt, tx, ty);
+    ctx.fillStyle='#fffbe8';
     ctx.fillText(txt, tx, ty);
     ctx.restore();
   });
@@ -1744,6 +1919,7 @@ function drawTargets(){
 }
 
 // ---- Projectile ----
+let _projWasAbove=false;
 function updateProjectile(dt){
   if(!projectile)return;
   trail.push({x:projectile.x,y:projectile.y});
@@ -1751,6 +1927,11 @@ function updateProjectile(dt){
   projectile.vy+=9.8*dt;
   projectile.x+=projectile.vx;
   projectile.y+=projectile.vy;
+  // Whistle when falling from above screen
+  if(projectile.y<0){ _projWasAbove=true; }
+  if(_projWasAbove && projectile.y>0 && projectile.vy>0){
+    sfxWhistle(projectile.vy);
+  }
   for(const t of targets){
     if(t.hit)continue;
     const tx=getGroupCX()+t.ox,ty=getGroupCY()+t.oy;
@@ -1932,6 +2113,8 @@ function gameLoop(ts){
     if(lf.x<-20){lf.x=canvas.width+20;}
   });
   drawBackground();
+  updateFish(dt);
+  drawFish();
   drawAimLine();
   updateTargets(dt);
   drawTargets();
@@ -2038,7 +2221,20 @@ function gameLoop(ts){
   track.addEventListener('pointermove', e=>{
     e.preventDefault();
     if(!sliderHoldActive) return;
-    if(!sliderCharging) moveDrag(e.clientY); // only adjust angle before charging
+    if(!sliderCharging){
+      // Still adjusting angle — reset hold timer on movement
+      moveDrag(e.clientY);
+      if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; }
+      // Restart 3s timer from last still position
+      holdStart = performance.now();
+      holdTimer = setTimeout(()=>{
+        if(sliderHoldActive && !projectile && ammoLeft>0 && !hitPopupPending){
+          sliderCharging = true;
+          charging = true;
+          chargeStart = performance.now();
+        }
+      }, 3000);
+    }
   });
 
   track.addEventListener('pointerup', e=>{
@@ -2076,11 +2272,12 @@ function gameLoop(ts){
 function initGame(){
   try { resizeCanvas(); } catch(e){ console.warn('resizeCanvas err',e); }
   window.addEventListener('resize', () => {
-    try { resizeCanvas(); initLeaves(); } catch(e){}
+    try { resizeCanvas(); initLeaves(); initFish(); } catch(e){}
   });
   try { buildCharSelect(); } catch(e){ console.error('buildCharSelect err',e); }
   try { initTargets(); } catch(e){ console.warn('initTargets err',e); }
   try { initLeaves(); } catch(e){ console.warn('initLeaves err',e); }
+  try { initFish(); } catch(e){ console.warn('initFish err',e); }
   try { updateHUD(); } catch(e){ console.warn('updateHUD err',e); }
   requestAnimationFrame(ts=>{lastTime=ts;gameLoop(ts);});
 }
@@ -2096,7 +2293,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v3.1
+     A321 前進楓之國  v3.2
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
