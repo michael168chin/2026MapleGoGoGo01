@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v3.4
+     版本：v3.5
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -39,7 +39,7 @@ body{background:#0a0f1a;display:flex;flex-direction:column;align-items:center;ju
   right:52px; top:5%; bottom:42%;
   width:44px;
   display:flex;flex-direction:column;align-items:center;
-  z-index:25;
+  z-index:15;
   background:rgba(10,20,40,0.55);
   border:1.5px solid rgba(255,215,0,0.4);
   border-radius:22px;
@@ -124,10 +124,11 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 /* ========= OVERLAYS COMMON ========= */
 .overlay{
   position:fixed;top:0;left:0;right:0;bottom:0;
-  background:rgba(0,0,0,0.82);display:none;z-index:100;
+  background:rgba(0,0,0,0.88);display:none;z-index:500;
   align-items:flex-start;justify-content:center;
   overflow-y:auto;overflow-x:hidden;padding:12px 0;
   -webkit-overflow-scrolling:touch;
+  pointer-events:auto;
 }
 .overlay.active{display:flex;}
 .panel{
@@ -187,7 +188,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 /* ========= HIT POPUP ========= */
 #hit-popup-backdrop{
   position:fixed;top:0;left:0;right:0;bottom:0;
-  background:rgba(0,0,0,0.55);z-index:200;display:none;
+  background:rgba(0,0,0,0.55);z-index:600;display:none;
   align-items:center;justify-content:center;
 }
 #hit-popup-backdrop.active{display:flex;}
@@ -310,9 +311,58 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
       <div style="border-bottom:1px solid #444;margin:10px 0;"></div>
     </div>
     <input type="text" id="player-name-input" placeholder="輸入你的名字..." maxlength="12">
-    <div id="char-select-grid"></div>
+    <div id="char-select-grid">
+        <div class="char-card selected" id="cc0" onclick="selectChar(0)">
+          <div class="char-emoji" style="background:#c0392b;">
+            <span style="font-size:1.6rem;line-height:1;">⚔️</span>
+          </div>
+          <div class="char-name">戰士</div>
+        </div>
+        <div class="char-card" id="cc1" onclick="selectChar(1)">
+          <div class="char-emoji" style="background:#27ae60;">
+            <span style="font-size:1.6rem;line-height:1;">🏹</span>
+          </div>
+          <div class="char-name">弓箭手</div>
+        </div>
+        <div class="char-card" id="cc2" onclick="selectChar(2)">
+          <div class="char-emoji" style="background:#8e44ad;">
+            <span style="font-size:1.6rem;line-height:1;">🔮</span>
+          </div>
+          <div class="char-name">魔法師</div>
+        </div>
+        <div class="char-card" id="cc3" onclick="selectChar(3)">
+          <div class="char-emoji" style="background:#2c3e50;">
+            <span style="font-size:1.6rem;line-height:1;">🗡️</span>
+          </div>
+          <div class="char-name">盜賊</div>
+        </div>
+        <div class="char-card" id="cc4" onclick="selectChar(4)">
+          <div class="char-emoji" style="background:#f39c12;">
+            <span style="font-size:1.6rem;line-height:1;">✨</span>
+          </div>
+          <div class="char-name">祭司</div>
+        </div>
+        <div class="char-card" id="cc5" onclick="selectChar(5)">
+          <div class="char-emoji" style="background:#1a3050;">
+            <span style="font-size:1.6rem;line-height:1;">🥷</span>
+          </div>
+          <div class="char-name">忍者</div>
+        </div>
+        <div class="char-card" id="cc6" onclick="selectChar(6)">
+          <div class="char-emoji" style="background:#e74c3c;">
+            <span style="font-size:1.6rem;line-height:1;">🔫</span>
+          </div>
+          <div class="char-name">海盜</div>
+        </div>
+        <div class="char-card" id="cc7" onclick="selectChar(7)">
+          <div class="char-emoji" style="background:#6a1a8a;">
+            <span style="font-size:1.6rem;line-height:1;">🌟</span>
+          </div>
+          <div class="char-name">召喚師</div>
+        </div>
+    </div>
     <div style="text-align:center;margin-top:8px;">
-      <button class="panel-btn" onclick="confirmChar()">⚔ 進入戰場！</button>
+      <button class="panel-btn" id="enter-btn" onclick="confirmChar()">⚔ 進入戰場！</button>
     </div>
   </div>
 </div>
@@ -708,36 +758,16 @@ function drawWeapon(ctx2, type, color) {
   }
 }
 
-// ===================== BUILD CHARACTER SELECT =====================
-// Pure HTML/CSS — no canvas per card, works on all devices including old iOS
-const CHAR_EMOJIS = ['⚔️','🏹','🔮','🗡️','✨','🥷','🔫','🌟'];
-const CHAR_COLORS = ['#c0392b','#27ae60','#8e44ad','#2c3e50','#f39c12','#2c3e50','#e74c3c','#8e44ad'];
-
+// ===================== CHARACTER SELECT =====================
+// Cards are static HTML — JS only manages selection state
+function selectChar(i){
+  document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
+  const card=document.getElementById('cc'+i);
+  if(card) card.classList.add('selected');
+  selectedChar=i;
+}
 function buildCharSelect() {
-  const grid = document.getElementById('char-select-grid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  CHAR_DEFS.forEach((def, i) => {
-    const card = document.createElement('div');
-    card.className = 'char-card' + (i===0?' selected':'');
-    card.onclick = () => {
-      document.querySelectorAll('.char-card').forEach(c=>c.classList.remove('selected'));
-      card.classList.add('selected');
-      selectedChar = i;
-    };
-    // Pure HTML sprite — no canvas, works everywhere
-    const emojiDiv = document.createElement('div');
-    emojiDiv.className = 'char-emoji';
-    emojiDiv.style.cssText = `background:${CHAR_COLORS[i]||'#555'};`;
-    emojiDiv.innerHTML = `<span style="font-size:1.6rem;line-height:1;">${CHAR_EMOJIS[i]||'👤'}</span>`;
-    const nm = document.createElement('div');
-    nm.className = 'char-name';
-    nm.textContent = def.name;
-    card.appendChild(emojiDiv);
-    card.appendChild(nm);
-    grid.appendChild(card);
-  });
-  // Load existing players non-blocking
+  // Cards already in HTML — just load players from Sheets
   loadExistingPlayers().catch(()=>{});
 }
 
@@ -779,10 +809,7 @@ function applyExistingPlayer() {
   document.getElementById('player-name-input').value = p.name;
   // Try to match character name
   const charIdx = CHAR_DEFS.findIndex(d => d.name === p.character);
-  if (charIdx >= 0) {
-    document.querySelectorAll('.char-card').forEach((c,i)=>c.classList.toggle('selected',i===charIdx));
-    selectedChar = charIdx;
-  }
+  if (charIdx >= 0) selectChar(charIdx);
 }
 
 async function confirmChar() {
@@ -2124,8 +2151,7 @@ function doReset(){
   initTargets();updateHUD();
   // Re-open character select
   document.getElementById('player-name-input').value='';
-  document.querySelectorAll('.char-card').forEach((c,i)=>{c.classList.toggle('selected',i===0);});
-  selectedChar=0;
+  selectChar(0);
   document.getElementById('char-overlay').classList.add('active');
 }
 
@@ -2336,7 +2362,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v3.4
+     A321 前進楓之國  v3.5
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
