@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v5.1
+     版本：v5.2
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.1</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.2</div>
     </div>
   </div>
 </div>
@@ -1056,6 +1056,56 @@ let leaves = [];
 // ---- Fish ----
 let fish = [];
 let _fishGlobalJumpCooldown = 0; // frames remaining before any fish can jump again
+
+// ---- Water ripples ----
+let ripples = []; // [{x, y, r, maxR, alpha, decay}]
+function spawnRipples(x, y, count, maxRadius, speed){
+  for(let i=0;i<count;i++){
+    ripples.push({
+      x: x + (Math.random()-0.5)*12,
+      y: y,
+      r: 2 + i*6,
+      maxR: maxRadius * (0.6 + Math.random()*0.6),
+      alpha: 0.55 - i*0.08,
+      grow: speed * (0.8 + Math.random()*0.4),
+      decay: 0.012 + i*0.004
+    });
+  }
+}
+function updateRipples(){
+  for(let i=ripples.length-1;i>=0;i--){
+    const rp=ripples[i];
+    rp.r += rp.grow;
+    rp.alpha -= rp.decay;
+    if(rp.alpha<=0 || rp.r>rp.maxR) ripples.splice(i,1);
+  }
+}
+function drawRipples(){
+  ripples.forEach(rp=>{
+    ctx.save();
+    ctx.globalAlpha=Math.max(0,rp.alpha);
+    ctx.strokeStyle='rgba(180,220,255,0.9)';
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.ellipse(rp.x, rp.y, rp.r, rp.r*0.28, 0, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+// ---- 3D Z-axis constants ----
+// X axis = canvas X (left=cannon, right=targets)
+// Z axis = depth: cannon at Z=0, lake centre Z=4, targets Z=9
+const Z_CANNON   = 0;
+const Z_LAKE_MIN = 2.5;
+const Z_LAKE_MAX = 5.5;
+const Z_TARGETS  = 9.0;
+const CANVAS_Z_SCALE = 10.0; // Z units across full canvas width
+function projZ(px){ return (px - cannonBase.x) / (canvas.width - cannonBase.x) * Z_TARGETS; }
+function fishZ(fy){
+  const {waterTop,waterBot}=fishRiverBounds();
+  return Z_LAKE_MIN + (fy-waterTop)/Math.max(1,waterBot-waterTop)*(Z_LAKE_MAX-Z_LAKE_MIN);
+}
 function initFish(){
   fish=[];
   const n = cfg.fishCount||12;
@@ -1212,6 +1262,51 @@ function drawFish(){
     ctx.restore();
   });
 }
+// Fish hit at water surface entry — fish launches UP out of water
+function spawnWaterFishHit(x, y, fishColor, vy, vx){
+  const entrySpd=Math.sqrt(vx*vx+vy*vy);
+  // Underwater flash
+  particles.push({
+    x,y:y+10,vx:0,vy:0,life:0.7,decay:0.06,
+    r:30+entrySpd*1.5,color:'rgba(255,250,180,0.6)',grav:0,isSmoke:false
+  });
+  // Fish launches up with high speed (it got blasted out of water)
+  for(let i=0;i<30;i++){
+    const a=-Math.PI/2+(Math.random()-0.5)*Math.PI*0.9;
+    const spd=4+Math.random()*10;
+    const colors=[fishColor,'#fff','rgba(160,220,255,0.9)','#ffe066','rgba(100,180,240,0.95)'];
+    particles.push({
+      x:x+(Math.random()-0.5)*20, y,
+      vx:Math.cos(a)*spd, vy:Math.sin(a)*spd,
+      life:1, decay:0.018+Math.random()*0.022,
+      r:5+Math.random()*10,
+      color:colors[~~(Math.random()*colors.length)],
+      grav:0.20
+    });
+  }
+  // Water column — large
+  for(let i=0;i<22;i++){
+    const a=-Math.PI/2+(Math.random()-0.5)*0.5;
+    const spd=entrySpd*0.5+3+Math.random()*6;
+    particles.push({
+      x:x+(Math.random()-0.5)*10, y,
+      vx:Math.cos(a)*spd, vy:Math.sin(a)*spd,
+      life:1, decay:0.020+Math.random()*0.018,
+      r:6+Math.random()*11,
+      color:'rgba(160,215,245,0.92)',
+      grav:0.24
+    });
+  }
+  // Big ripples
+  spawnRipples(x, y+8, 5, 200, 3.5);
+  // Heavy impact sound
+  try{
+    playTone(100,'sine',0.35,0.35,35);
+    setTimeout(()=>playTone(200,'triangle',0.20,0.22,90),100);
+    setTimeout(()=>playTone(140,'sine',0.15,0.18,60),200);
+  }catch(e){}
+}
+
 function spawnFishHit(x, y, fishColor){
   // Large water column eruption upwards
   for(let i=0;i<35;i++){
@@ -1249,6 +1344,61 @@ function spawnFishHit(x, y, fishColor){
   try{
     playTone(140,'sine',0.2,0.2,60);
     setTimeout(()=>playTone(200,'triangle',0.12,0.15,80),60);
+  }catch(e){}
+}
+
+// ---- Water entry: called when projectile crosses water surface ----
+function spawnWaterEntry(x, vy, vx){
+  const entrySpeed = Math.sqrt(vx*vx + vy*vy);
+  const entryAngle = Math.abs(Math.atan2(Math.abs(vy), Math.abs(vx))); // 0=horizontal, PI/2=vertical
+  const isHighAngle = entryAngle > Math.PI/3; // >60°
+
+  // Water column: higher angle → taller column
+  const colH = isHighAngle ? 0.18 : 0.10; // fraction of canvas height
+  const colCount = isHighAngle ? 28 : 16;
+  const colSpread = isHighAngle ? 0.35 : 0.55; // angular spread (radians from vertical)
+  for(let i=0;i<colCount;i++){
+    const a = -Math.PI/2 + (Math.random()-0.5)*colSpread*2;
+    const spd = (entrySpeed*0.45 + 2) * (0.5+Math.random()*0.6);
+    const colors = ['rgba(160,210,245,0.95)','rgba(200,235,255,0.9)','#fff','rgba(120,180,220,0.8)'];
+    particles.push({
+      x: x+(Math.random()-0.5)*14,
+      y: canvas.height*0.595,
+      vx: Math.cos(a)*spd,
+      vy: Math.sin(a)*spd,
+      life:1, decay:0.022+Math.random()*0.02,
+      r: isHighAngle?(5+Math.random()*9):(3+Math.random()*6),
+      color: colors[~~(Math.random()*colors.length)],
+      grav: 0.22
+    });
+  }
+  // Side spray
+  for(let i=0;i<14;i++){
+    const side = i<7?-1:1;
+    const a = (side>0?0:Math.PI) + (Math.random()-0.5)*0.7;
+    const spd = 2.5+Math.random()*4.5;
+    particles.push({
+      x, y: canvas.height*0.598,
+      vx:Math.cos(a)*spd*side, vy:-Math.random()*2.5,
+      life:0.85, decay:0.038+Math.random()*0.03,
+      r:2+Math.random()*4,
+      color:'rgba(160,215,245,0.85)',
+      grav:0.28
+    });
+  }
+  // Ripples — more rings for high angle
+  spawnRipples(x, canvas.height*0.603, isHighAngle?4:2, isHighAngle?140:80, isHighAngle?3.0:1.8);
+
+  // Sound: high-angle = heavy thud, low-angle = lighter plop
+  try{
+    if(isHighAngle){
+      playTone(110,'sine',0.28,0.28,45);
+      setTimeout(()=>playTone(180,'triangle',0.18,0.20,80),90);
+      setTimeout(()=>playTone(80,'sine',0.15,0.18,40),180);
+    } else {
+      playTone(160,'sine',0.18,0.20,80);
+      setTimeout(()=>playTone(240,'sine',0.12,0.14,120),80);
+    }
   }catch(e){}
 }
 
@@ -1468,6 +1618,7 @@ function fire() {
   projectile={x:tipX,y:tipY,vx:Math.cos(angle)*spd,vy:Math.sin(angle)*spd,r:8};
   stopWhistle();
   _projWasAbove=false;
+  _projWasInWater=false;
   trail=[];
   ammoLeft--;
   power=0.5;
@@ -2181,6 +2332,7 @@ function drawTargets(){
 
 // ---- Projectile ----
 let _projWasAbove=false;
+let _projWasInWater=false; // track water entry
 function updateProjectile(dt){
   if(!projectile)return;
   trail.push({x:projectile.x,y:projectile.y});
@@ -2188,59 +2340,109 @@ function updateProjectile(dt){
   projectile.vy+=9.8*dt;
   projectile.x+=projectile.vx;
   projectile.y+=projectile.vy;
-  // Whistle when falling back from above screen
+
+  // Whistle when falling from above screen
   if(projectile.y<0){ _projWasAbove=true; }
-  if(_projWasAbove && projectile.vy>0){
-    updateWhistle(projectile.vy); // continuous update as speed increases
-  }
-  for(const t of targets){
-    if(t.hit)continue;
-    const tx=getGroupCX()+t.ox,ty=getGroupCY()+t.oy;
-    const dx=projectile.x-tx,dy=projectile.y-ty;
-    if(Math.sqrt(dx*dx+dy*dy)<t.r+projectile.r){
-      t.hit=true;
-      hitPopupPending=true; // block round-end until popup confirmed
-      score+=t.pts;
-      spawnHit(tx,ty,tierColor(t.pts));
-      stopWhistle();
-      sfxHit(t.pts);
-      updateHUD();
-      projectile=null;trail=[];
-      // Delay popup 1.5s so hit explosion plays first
-      const _hpx=tx,_hpy=ty,_hpts=t.pts,_hci=t.charIdx;
-      setTimeout(()=>{ showHitPopup(_hpx,_hpy,_hpts,_hci); },1500);
-      checkRoundEnd();
-      return;
-    }
-  }
-  // Check if projectile hits a fish in the water (no score, just visual effect)
-  if(projectile){
-    const riverL=canvas.width*0.25, riverR=canvas.width*0.65;
-    const waterTop=canvas.height*0.59;
-    if(projectile.x>riverL && projectile.x<riverR && projectile.y>waterTop){
-      for(let fi=0;fi<fish.length;fi++){
-        const f=fish[fi];
-        if(f.stunTimer>0) continue; // already stunned
-        const fx2=f.jumping?f.x+f.jumpX:f.x;
-        const fy2=f.jumping?f.y+f.jumpY:f.y;
-        const fdx=projectile.x-fx2, fdy=projectile.y-fy2;
-        const fDist=Math.sqrt(fdx*fdx+fdy*fdy);
-        if(fDist < f.size*1.6 + projectile.r){
-          // Fish hit! Stun it and spawn splash
-          f.stunTimer = 120; // 2 seconds at 60fps
-          f.flipped = true;   // belly-up
-          f.vx = (fdx/Math.max(1,fDist))*3 + (Math.random()-0.5)*2;
-          f.vy = (fdy/Math.max(1,fDist))*3 - 2;
-          f.jumping = false;
-          spawnFishHit(fx2, fy2, f.color);
-          // Projectile continues (doesn't stop from hitting fish)
-        }
+  if(_projWasAbove && projectile.vy>0){ updateWhistle(projectile.vy); }
+
+  // ---- 3D Z-axis value for projectile ----
+  const pZ = projZ(projectile.x); // 0 near cannon, 9 near targets
+
+  // ---- Target hit check (targets live at Z≈9, only on downward flight) ----
+  // Only allow hit when projectile is descending (vy>0) or nearly horizontal
+  if(projectile.vy > -1){  // not strongly ascending
+    for(const t of targets){
+      if(t.hit) continue;
+      const tx=getGroupCX()+t.ox, ty=getGroupCY()+t.oy;
+      const dx=projectile.x-tx, dy=projectile.y-ty;
+      const dist2D=Math.sqrt(dx*dx+dy*dy);
+      // 3D check: Z must be close to target zone (Z≈8~10)
+      const zOK = pZ >= 7.5;
+      if(dist2D < t.r+projectile.r && zOK){
+        t.hit=true;
+        hitPopupPending=true;
+        score+=t.pts;
+        spawnHit(tx,ty,tierColor(t.pts));
+        stopWhistle();
+        sfxHit(t.pts);
+        updateHUD();
+        projectile=null; trail=[];
+        const _hpx=tx,_hpy=ty,_hpts=t.pts,_hci=t.charIdx;
+        setTimeout(()=>{ showHitPopup(_hpx,_hpy,_hpts,_hci); },1500);
+        checkRoundEnd();
+        return;
       }
     }
   }
-  if(projectile.x>canvas.width+20||projectile.x<-20||projectile.y>canvas.height+20){
+
+  // ---- Water surface entry detection ----
+  const {riverL,riverR}=fishRiverBounds();
+  const waterSurfaceY = canvas.height * 0.595;
+  const inLakeX = projectile.x > canvas.width*0.22 && projectile.x < canvas.width*0.72;
+
+  if(!_projWasInWater && projectile.vy > 0 &&
+     projectile.y >= waterSurfaceY && projectile.y < waterSurfaceY + Math.abs(projectile.vy)+2 &&
+     inLakeX){
+    _projWasInWater = true;
     stopWhistle();
-    projectile=null;trail=[];
+    // ---- 3D fish hit check at water entry ----
+    // Only fish whose Z is close to projectile's Z at this X position
+    let hitAFish = false;
+    for(let fi=0;fi<fish.length;fi++){
+      const f=fish[fi];
+      if(f.stunTimer>0 || f.jumping) continue;
+      const fx2=f.x, fy2=f.y;
+      // 3D distance check
+      const fdx=projectile.x-fx2, fdy=projectile.y-fy2;
+      const dist2D=Math.sqrt(fdx*fdx+fdy*fdy);
+      // Z axis: fish depth vs projectile depth at this X
+      const fz=fishZ(fy2);
+      const zDiff=Math.abs(pZ-fz);
+      // XY close enough AND Z planes overlap
+      if(dist2D < f.size*2.2 + projectile.r && zDiff < 1.8){
+        f.stunTimer=150; f.flipped=true;
+        f.vx=(fdx/Math.max(1,dist2D))*2+(Math.random()-0.5);
+        f.vy=-3.5-Math.random()*2; // launch upward
+        f.jumping=false;
+        // Fish flies out of water with big explosion
+        spawnWaterFishHit(fx2, fy2, f.color, projectile.vy, projectile.vx);
+        hitAFish=true;
+      }
+    }
+    if(hitAFish){
+      spawnWaterEntry(projectile.x, projectile.vy*1.4, projectile.vx); // extra big
+    } else {
+      spawnWaterEntry(projectile.x, projectile.vy, projectile.vx);
+    }
+    // Projectile sinks: remove after entry
+    projectile=null; trail=[];
+    checkRoundEnd();
+    return;
+  }
+
+  // ---- Fish hit check while projectile is already in water (missed surface) ----
+  if(projectile && _projWasInWater && inLakeX){
+    for(let fi=0;fi<fish.length;fi++){
+      const f=fish[fi];
+      if(f.stunTimer>0) continue;
+      const fx2=f.jumping?f.x+f.jumpX:f.x;
+      const fy2=f.jumping?f.y+f.jumpY:f.y;
+      const fdx=projectile.x-fx2, fdy=projectile.y-fy2;
+      const dist2D=Math.sqrt(fdx*fdx+fdy*fdy);
+      const fz=fishZ(fy2);
+      const zDiff=Math.abs(pZ-fz);
+      if(dist2D < f.size*1.8+projectile.r && zDiff < 1.5){
+        f.stunTimer=150; f.flipped=true;
+        f.vx=(fdx/Math.max(1,dist2D))*2+(Math.random()-0.5);
+        f.vy=-2.5-Math.random()*1.5;
+        spawnFishHit(fx2,fy2,f.color);
+      }
+    }
+  }
+
+  if(projectile && (projectile.x>canvas.width+20||projectile.x<-20||projectile.y>canvas.height+20)){
+    stopWhistle();
+    projectile=null; trail=[];
     checkRoundEnd();
   }
 }
@@ -2437,6 +2639,8 @@ function gameLoop(ts){
     if(lf.x<-20){lf.x=canvas.width+20;}
   });
   drawBackground();
+  drawRipples();
+  updateRipples();
   updateFish(dt);
   drawFish();
   drawAimLine();
@@ -2499,7 +2703,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v5.1
+     A321 前進楓之國  v5.2
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
