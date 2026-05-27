@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v4.8
+     版本：v4.9
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.8</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v4.9</div>
     </div>
   </div>
 </div>
@@ -1313,15 +1313,18 @@ canvas.addEventListener('mouseup',e=>{
 // Drag = adjust angle by relative vertical movement
 // Hold still 2s = start charging; release = fire
 let _touchHoldTimer=null, _touchCharging=false;
-let _touchLastY=0, _touchStartY=0, _touchMoved=false;
-const TOUCH_ANGLE_SENS = 0.008; // radians per pixel of drag
+let _touchLastY=0, _touchStartY=0, _touchLastX=0, _touchStartX=0, _touchMoved=false;
+const TOUCH_ANGLE_SENS = 0.008; // radians per pixel of vertical drag
+const TOUCH_POWER_SENS = 0.004; // power change per pixel of horizontal drag
 
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
   if(hitPopupPending||gameOver) return;
   const t=e.touches[0];
   _touchLastY = t.clientY;
+  _touchLastX = t.clientX;
   _touchStartY = t.clientY;
+  _touchStartX = t.clientX;
   _touchMoved = false;
   _touchCharging = false;
   if(_touchHoldTimer) clearTimeout(_touchHoldTimer);
@@ -1342,9 +1345,14 @@ canvas.addEventListener('touchmove',e=>{
   if(hitPopupPending||gameOver) return;
   const t=e.touches[0];
   const dy = t.clientY - _touchLastY;
+  const dx = t.clientX - _touchLastX;
   _touchLastY = t.clientY;
+  _touchLastX = t.clientX;
+  const totalDist = Math.sqrt(
+    (t.clientX-_touchStartX)**2 + (t.clientY-_touchStartY)**2
+  );
   // If moved more than 8px from start, consider it a drag (not a hold)
-  if(Math.abs(t.clientY - _touchStartY) > 8){
+  if(totalDist > 8){
     _touchMoved = true;
     // Cancel hold timer on significant movement
     if(_touchHoldTimer && !_touchCharging){
@@ -1359,10 +1367,18 @@ canvas.addEventListener('touchmove',e=>{
     }
   }
   if(!_touchCharging){
-    // Drag up → angle goes up (more negative), drag down → angle goes down
-    const AMAX=-Math.PI/2, AMIN=Math.PI/12;
-    angle = Math.max(AMAX, Math.min(AMIN, angle + dy * TOUCH_ANGLE_SENS));
-    if(Math.abs(dy)>1){ sfxAngleTick(); _prevAngle=angle; }
+    // Determine dominant axis of movement
+    const absX = Math.abs(dx), absY = Math.abs(dy);
+    if(absY > absX){
+      // Vertical drag → adjust angle
+      const AMAX=-Math.PI/2, AMIN=Math.PI/10;
+      angle = Math.max(AMAX, Math.min(AMIN, angle + dy * TOUCH_ANGLE_SENS));
+      if(absY>1){ sfxAngleTick(); _prevAngle=angle; }
+    } else {
+      // Horizontal drag → adjust power (landing distance)
+      // Swipe right = more power (farther), swipe left = less power (closer)
+      power = Math.max(0.05, Math.min(1.0, power + dx * TOUCH_POWER_SENS));
+    }
     updateHUD();
   }
 },{passive:false});
@@ -2156,25 +2172,33 @@ function drawProjectile(){
 // ---- Aim line ----
 function drawAimLine(){
   if(projectile||gameOver||ammoLeft<=0)return;
-  const spd=8+power*16;
-  // Collect all arc points
-  const pts=[];
-  let ax=cannonBase.x+Math.cos(angle)*48, ay=cannonBase.y+Math.sin(angle)*48;
+  // Use IDENTICAL physics to the real projectile (same dt=1/60, same speed formula)
+  const minSpd=8, maxSpd=24;
+  const spd = minSpd + power*(maxSpd-minSpd); // EXACT same as fire()
+  const dt = 1/60; // match real game loop dt
+  const tipX=cannonBase.x+Math.cos(angle)*46;
+  const tipY=cannonBase.y+Math.sin(angle)*46;
+  let ax=tipX, ay=tipY;
   let vx=Math.cos(angle)*spd, vy=Math.sin(angle)*spd;
-  pts.push([ax,ay]);
-  for(let i=0;i<200;i++){
-    vy+=9.8*0.05; ax+=vx; ay+=vy;
-    if(ax>canvas.width+150 || ay>canvas.height+30) break;
+  const pts=[[ax,ay]];
+  // Simulate up to 600 frames (10 seconds) — enough to reach any target
+  for(let i=0;i<600;i++){
+    vy += 9.8*dt;  // identical to updateProjectile
+    ax += vx;       // identical to updateProjectile
+    ay += vy;       // identical to updateProjectile
+    if(ax > canvas.width+160 || ay > canvas.height+40) break;
     pts.push([ax,ay]);
+    // Also stop if projectile has clearly landed and moved far right
+    if(ay > canvas.height*0.95 && i > 60) break;
   }
   if(pts.length<2) return;
   ctx.save();
-  // Draw in 3 fading segments for fade effect
+  // Draw in 3 fading segments
   const seg=Math.ceil(pts.length/3);
   const segs=[
-    {pts:pts.slice(0,seg), alpha:0.80},
-    {pts:pts.slice(seg,seg*2), alpha:0.50},
-    {pts:pts.slice(seg*2), alpha:0.28},
+    {pts:pts.slice(0,seg),        alpha:0.82},
+    {pts:pts.slice(seg,seg*2),    alpha:0.50},
+    {pts:pts.slice(seg*2),        alpha:0.26},
   ];
   segs.forEach(({pts:sp,alpha})=>{
     if(sp.length<2) return;
@@ -2384,7 +2408,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v4.8
+     A321 前進楓之國  v4.9
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
