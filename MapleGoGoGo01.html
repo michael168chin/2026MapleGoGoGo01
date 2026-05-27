@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v5.5
+     版本：v5.6
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.5</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.6</div>
     </div>
   </div>
 </div>
@@ -1497,7 +1497,8 @@ function updateHUD() {
   document.getElementById('round-display').textContent=`${round}/${cfg.totalRounds}`;
   const pitchDeg = Math.round(-angle * 180/Math.PI);
   const yawDeg   = Math.round(yaw * 180/Math.PI);
-  const yawStr   = yawDeg===0 ? '正對' : (yawDeg>0 ? '右'+yawDeg+'°' : '左'+Math.abs(yawDeg)+'°');
+  // yaw<0 = 偏遠(左), yaw>0 = 偏近(右)
+  const yawStr   = yawDeg===0 ? '正對' : (yawDeg<0 ? '遠'+Math.abs(yawDeg)+'°' : '近'+yawDeg+'°');
   document.getElementById('angle-display').textContent=pitchDeg+'° '+yawStr;
   const pct=Math.round(power*100);
   document.getElementById('power-display').textContent=pct+'%';
@@ -1635,7 +1636,9 @@ function fire() {
   const tipX = cannonBase.x + Math.cos(angle)*46;
   const tipY = cannonBase.y + Math.sin(angle)*46;
   // Z encodes yaw direction: yaw>0 = deeper into scene
-  const vz3 = Math.abs(Math.sin(yaw)) * spd * 0.3; // Z speed from yaw magnitude
+  // Z encodes depth perception: yaw<0 (far) → larger Z → smaller on screen
+  // yaw>0 (near) → smaller Z → normal size
+  const vz3 = -Math.sin(yaw) * spd * 0.25; // negative yaw → positive Z → farther
   // yaw shifts the effective target: store yaw offset so collision uses it
   const {dx:yOx, dy:yOy} = yawLandingOffset();
   projectile = {
@@ -2411,19 +2414,18 @@ function proj3D(wx, wy, wz){
 }
 
 // ---- Yaw → screen landing offset on right-bank arc ----
-// The yellow circles in the reference image trace a diagonal arc on the right bank
-// Arc direction: upper-left (yaw=-30°) to lower-right (yaw=+30°)
-// Arc slope: ~1:1 (dY ≈ dX) on screen
-// This function returns the {dx,dy} screen offset to apply to the aim landing point
+// From image analysis (4 colored circles):
+//   Arc is nearly VERTICAL: dy=161px, dx=35px over 60° total yaw range
+//   yaw=-30° (left/far) → landing HIGHER on screen (smaller Y) 
+//   yaw=+30° (right/near) → landing LOWER on screen (larger Y)
+//   Zone height ≈ canvas.height*0.40, arc spans ~80% of zone height
+//   Zone width used for tiny X shift (~18% of arc Y)
 function yawLandingOffset(){
-  const cw=canvas.width, ch=canvas.height;
-  // Arc spans: from zone left-top (yaw=-30°) to zone right-bottom (yaw=+30°)
-  // Total arc X = getZoneW() * 0.7, arc Y = same (slope ~1)
-  const arcRadius = getZoneW() * 0.65; // total arc half-span in X
-  const t = yaw / YAW_MAX;  // -1 to +1
-  const dx = arcRadius * t;
-  const dy = arcRadius * t * 1.02;  // ~45° diagonal (slope 1:1)
-  return {dx, dy};
+  const t = yaw / YAW_MAX;  // -1=left/far, +1=right/near
+  // Nearly vertical arc: mostly Y, tiny X
+  const arcY = getZoneH() * 0.80 * t;  // +t → lower (near), -t → higher (far)
+  const arcX = getZoneW() * 0.18 * t;  // tiny horizontal component
+  return {dx: arcX, dy: arcY};
 }
 
 // ---- Projectile ----
@@ -2558,7 +2560,7 @@ function drawAimLine(){
   let vx = Math.cos(angle)*spd;
   let vy = Math.sin(angle)*spd;
   let az = 0.2;
-  const vz3 = Math.abs(Math.sin(yaw))*spd*0.3;
+  const vz3 = -Math.sin(yaw)*spd*0.25; // yaw<0(far)→Z grows, yaw>0(near)→Z shrinks
   // Yaw landing offset — applied progressively along trajectory
   const {dx:yOx, dy:yOy} = yawLandingOffset();
   const pts=[];
@@ -2811,7 +2813,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v5.5
+     A321 前進楓之國  v5.6
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
