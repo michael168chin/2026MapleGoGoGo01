@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v5.3
+     版本：v5.4
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.3</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.4</div>
     </div>
   </div>
 </div>
@@ -1638,13 +1638,15 @@ function fire() {
   const vx3 = hSpd * Math.cos(yaw);    // X component (yaw=0 → pure right)
   const vy3 = Math.sin(pitch) * spd;   // Y component (negative = up)
   const vz3 = hSpd * Math.sin(yaw);    // Z component (yaw>0 → right = away)
-  const tipX = cannonBase.x + Math.cos(pitch)*Math.cos(yaw)*46;
-  const tipY = cannonBase.y + Math.sin(pitch)*46;
+  // Start projectile at cannon tip (world coords)
+  const wTipX = cannonBase.x + Math.cos(pitch)*Math.cos(yaw)*46;
+  const wTipY = cannonBase.y + Math.sin(pitch)*46;
   projectile = {
-    x:tipX, y:tipY,
-    z: 0.2,           // start just in front of cannon
+    x:wTipX, y:wTipY,
+    z: 0.2,
     vx:vx3, vy:vy3, vz:vz3, r:8
   };
+  const {sx:tipX, sy:tipY}=proj3D(wTipX,wTipY,0.2);
   stopWhistle();
   _projWasAbove=false; _projWasInWater=false; trail=[];
   ammoLeft--; power=0.5;
@@ -2289,6 +2291,29 @@ function drawCannon(){
   ctx.stroke();ctx.setLineDash([]);
   ctx.restore();
 
+  // ---- Yaw direction indicator ----
+  if(Math.abs(yaw)>0.03){
+    ctx.save();
+    ctx.strokeStyle=`rgba(255,200,60,${0.3+Math.abs(yaw)/YAW_MAX*0.45})`;
+    ctx.lineWidth=1.5*sc;
+    ctx.setLineDash([4*sc,4*sc]);
+    // Draw arc showing aim direction on ground
+    const arcR=60*sc;
+    ctx.beginPath();
+    ctx.arc(x, y+6*sc, arcR, angle-0.12, angle+0.12);
+    ctx.stroke();
+    // Show yaw deflection line
+    const yawAngle2D = angle + yaw*0.6; // visual approximation
+    ctx.strokeStyle=`rgba(255,160,50,${0.5+Math.abs(yaw)/YAW_MAX*0.3})`;
+    ctx.lineWidth=1.5*sc;
+    ctx.beginPath();
+    ctx.moveTo(x,y+6*sc);
+    ctx.lineTo(x+Math.cos(yawAngle2D)*arcR*0.9, y+6*sc+Math.sin(angle)*arcR*0.9);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
   // ---- Charge glow ----
   if(charging){
     const elapsed=(performance.now()-chargeStart)/1000;
@@ -2363,16 +2388,45 @@ function drawTargets(){
   });
 }
 
-// ---- 3D → screen projection ----
-// Projects 3D world position to canvas 2D screen position
-// World origin = cannon base area; Z goes away from viewer
+// ---- 3D → screen projection (true scene perspective) ----
+//
+// Scene layout:
+//   horizonY = ch * 0.44  (vanishing point / sky-ground boundary)
+//   nearGroundY = ch * 0.60  (left ground, Z=0)
+//   farGroundY  = ch * 0.58  (right ground, Z≈9, slightly above nearGround due to perspective)
+//   farGroundX  = cw * 0.85  (centre of right bank)
+//
+// Mapping:
+//   Z=0 (cannon area): screen Y = nearGroundY
+//   Z=Z_TARGETS (right bank): screen Y = farGroundY
+//   Intermediate Z: linear interpolation toward horizon
+//   World Y (height above ground plane) scales with depth
+//
 function proj3D(wx, wy, wz){
-  const scale = FOCAL_Z / Math.max(0.1, FOCAL_Z + wz);
-  // Screen origin for projection: cannon base area
-  const ox = cannonBase.x;
-  const oy = cannonBase.y;
-  const sx = ox + (wx - ox) * scale;
-  const sy = oy + (wy - oy) * scale;
+  const cw=canvas.width, ch=canvas.height;
+  const horizonY   = ch * 0.44;
+  const nearGroundY= ch * 0.60;
+  const farGroundY = ch * 0.58;
+  const tZ = Math.max(0, Math.min(1, wz / Z_TARGETS)); // 0=near, 1=far
+  
+  // Ground Y at this depth (perspective convergence toward horizon)
+  const groundAtZ = nearGroundY + (farGroundY - nearGroundY) * tZ
+                  + (horizonY - nearGroundY) * tZ * tZ * 0.35;
+
+  // Height above ground (world Y is negative=up, so wy < groundAtZ means above ground)
+  // At far depth, height appears compressed
+  const heightScale = 1.0 - tZ * 0.55;
+  const sy = groundAtZ + (wy - nearGroundY) * heightScale;
+
+  // X: perspective compress horizontally toward a lateral vanishing point
+  // Near (Z=0): X is literal canvas X
+  // Far (Z=Z_TARGETS): X converges slightly toward canvas centre
+  const xCompress = 1.0 - tZ * 0.18;
+  const midX = cw * 0.5;
+  const sx = midX + (wx - midX) * xCompress;
+
+  // Scale factor (for drawing size of projectile)
+  const scale = Math.max(0.25, 1.0 - tZ * 0.55);
   return {sx, sy, scale};
 }
 
@@ -2426,8 +2480,7 @@ function updateProjectile(dt){
   }
 
   // ---- Water surface entry detection ----
-  // Use projected screen position for visual checks
-  const {sx:psx, sy:psy} = proj3D(projectile.x, projectile.y, projectile.z);
+  const {sx:psx, sy:psy, scale:pscale} = proj3D(projectile.x, projectile.y, projectile.z);
   const waterSurfaceY = canvas.height * 0.595;
   const pZ3 = projectile.z;
   // Lake Z range: 2~6 (lake exists in middle depth)
@@ -2498,24 +2551,30 @@ function drawAimLine(){
   const dt = 1/60;
   const pitch = angle;
   const hSpd = Math.cos(pitch)*spd;
-  const avx = hSpd*Math.cos(yaw);
-  const avy = Math.sin(pitch)*spd;
-  const avz = hSpd*Math.sin(yaw);
-  const tipX = cannonBase.x + Math.cos(pitch)*Math.cos(yaw)*46;
-  const tipY = cannonBase.y + Math.sin(pitch)*46;
-  let ax=tipX, ay=tipY, az=0.2;
+  // 3D velocity: yaw rotates the aim direction
+  const avx = hSpd*Math.cos(yaw);   // world X velocity
+  const avy = Math.sin(pitch)*spd;  // world Y velocity (negative=up)
+  const avz = hSpd*Math.sin(yaw);   // world Z velocity (into scene)
+  // Start at cannon tip world position
+  let ax=cannonBase.x + Math.cos(pitch)*Math.cos(yaw)*40;
+  let ay=cannonBase.y + Math.sin(pitch)*40;
+  let az=0.15;
   let vx=avx, vy=avy, vz=avz;
   const pts=[];
   const waterSY = canvas.height*0.595;
-  for(let i=0;i<600;i++){
+  for(let i=0;i<700;i++){
     vy+=9.8*dt; ax+=vx; ay+=vy; az+=vz;
     if(az<0) az=0;
     const {sx,sy,scale}=proj3D(ax,ay,az);
-    if(sx>canvas.width+160||sy>canvas.height+40||az>Z_TARGETS+4) break;
-    pts.push({sx,sy,scale});
-    // Stop at water surface if in lake Z range
-    if(sy>=waterSY && sy<waterSY+16 && sx>canvas.width*0.22 && sx<canvas.width*0.72 && az>1.5 && vy>0) break;
-    if(sy>canvas.height*0.95 && i>60) break;
+    // Stop if way off screen or past target Z
+    if(sx>canvas.width+200||sy>canvas.height+50||az>Z_TARGETS+5) break;
+    if(sx<-100) break;
+    pts.push({sx,sy,scale,ax,ay,az});
+    // Water surface stop: projected Y at water level AND in lake X range AND correct Z depth
+    if(vy>0 && sy>=waterSY && sy<waterSY+Math.abs(vy)*1.5+5
+       && sx>canvas.width*0.20 && sx<canvas.width*0.73
+       && az>Z_LAKE_MIN && az<Z_LAKE_MAX+1) break;
+    if(sy>canvas.height*0.96 && i>80) break;
   }
   if(pts.length<2) return;
   ctx.save();
@@ -2743,7 +2802,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v5.3
+     A321 前進楓之國  v5.4
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
