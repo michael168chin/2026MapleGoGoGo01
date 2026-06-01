@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v6.6
+     版本：v6.7
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.6</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.7</div>
     </div>
   </div>
 </div>
@@ -390,7 +390,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     <div class="setting-row">
       <label>砲彈數量</label>
       <input type="range" id="set-ammo" min="1" max="20" step="1" value="3" oninput="document.getElementById('set-ammo-val').textContent=this.value">
-      <span class="setting-val" id="set-ammo-val">10</span>
+      <span class="setting-val" id="set-ammo-val">3</span>
     </div>
     <div class="setting-row">
       <label>總輪次</label>
@@ -401,15 +401,15 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">🐟 魚群設定</div>
     <div class="setting-row">
       <label>魚群游速</label>
-      <input type="range" id="set-fish-spd" min="0.0" max="2.0" step="0.05" value="0.4"
+      <input type="range" id="set-fish-spd" min="0.0" max="3.0" step="0.05" value="1.2"
         oninput="document.getElementById('set-fish-spd-val').textContent=parseFloat(this.value).toFixed(1)">
-      <span class="setting-val" id="set-fish-spd-val">0.40</span>
+      <span class="setting-val" id="set-fish-spd-val">1.20</span>
     </div>
     <div class="setting-row">
       <label>魚群數量</label>
       <input type="range" id="set-fish-cnt" min="0" max="100" step="1" value="20"
         oninput="document.getElementById('set-fish-cnt-val').textContent=this.value">
-      <span class="setting-val" id="set-fish-cnt-val">8</span>
+      <span class="setting-val" id="set-fish-cnt-val">20</span>
     </div>
     <div class="setting-row">
       <label>魚跳間隔(秒)</label>
@@ -602,11 +602,11 @@ function sfxAngleTick(){
 const cfg = {
   title: 'A321 前進楓之國',
   speedMult: 2.5,
-  ammoPerRound: 10,
+  ammoPerRound: 3,
   totalRounds: 3,
   skyTexts: ['實動抽', '達標抽', '報聘抽2次', '排名抽', '', ''],  // 6 groups
-  fishSpeed: 0.4,
-  fishCount: 8,
+  fishSpeed: 1.2,
+  fishCount: 20,
   fishJumpSec: 25,
   skyFontScale: 1.3,  // font scale multiplier (1.0 = base ~15pt at 900px)
   fishEffect: true,   // show fish explosion effect
@@ -646,10 +646,10 @@ function applyParamsFromSheet(v){
   if(!v || v.length < 22) return;
   if(v[0]!==null&&v[0]!=='') cfg.title = String(v[0]);
   if(v[1]!==null&&v[1]!=='') cfg.speedMult   = parseFloat(v[1]) || 2.5;
-  if(v[2]!==null&&v[2]!=='') cfg.ammoPerRound= parseInt(v[2])   || 10;
+  if(v[2]!==null&&v[2]!=='') cfg.ammoPerRound= parseInt(v[2])   || 3;
   if(v[3]!==null&&v[3]!=='') cfg.totalRounds = parseInt(v[3])   || 3;
-  if(v[4]!==null&&v[4]!=='') cfg.fishSpeed   = parseFloat(v[4]) || 0.4;
-  if(v[5]!==null&&v[5]!=='') cfg.fishCount   = parseInt(v[5])   || 8;
+  if(v[4]!==null&&v[4]!=='') cfg.fishSpeed   = parseFloat(v[4]) || 1.2;
+  if(v[5]!==null&&v[5]!=='') cfg.fishCount   = parseInt(v[5])   || 20;
   if(v[6]!==null&&v[6]!=='') cfg.fishJumpSec = parseInt(v[6])   || 25;
   for(let i=0;i<6;i++) cfg.skyTexts[i] = (v[7+i]!==null&&v[7+i]!==undefined)?String(v[7+i]):'';
   // B15 (index 13) = skyFontScale (NEW - inserted between sky texts and prizes)
@@ -977,8 +977,8 @@ function closeSettings() { document.getElementById('settings-overlay').classList
 // Apply hardcoded defaults to gear UI fields (B23/B24 also reset)
 function applyDefaultParams(){
   const DEF={
-    title:'A321 前進楓之國', speedMult:2.5, ammoPerRound:10, totalRounds:3,
-    fishSpeed:0.4, fishCount:8, fishJumpSec:25,
+    title:'A321 前進楓之國', speedMult:2.5, ammoPerRound:3, totalRounds:3,
+    fishSpeed:1.2, fishCount:20, fishJumpSec:25,
     skyTexts:['實動抽','達標抽','報聘抽2次','排名抽','',''],
     fishEffect:true, hideAimLine:false
   };
@@ -1277,7 +1277,7 @@ function createFish(startRight){
 function updateFish(dt){
   const {riverL,riverR,waterTop,waterBot}=fishRiverBounds();
   // Only trim excess; do NOT auto-replenish dead fish
-  while(fish.length > (cfg.fishCount||8)) fish.pop();
+  while(fish.length > (cfg.fishCount||20)) fish.pop();
   // Global jump cooldown countdown
   if(_fishGlobalJumpCooldown > 0) _fishGlobalJumpCooldown--;
 
@@ -3166,7 +3166,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v6.6
+     A321 前進楓之國  v6.7
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
