@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v6.3
+     版本：v6.4
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.3</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.4</div>
     </div>
   </div>
 </div>
@@ -407,7 +407,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div class="setting-row">
       <label>魚群數量</label>
-      <input type="range" id="set-fish-cnt" min="0" max="30" step="1" value="8"
+      <input type="range" id="set-fish-cnt" min="0" max="100" step="1" value="8"
         oninput="document.getElementById('set-fish-cnt-val').textContent=this.value">
       <span class="setting-val" id="set-fish-cnt-val">8</span>
     </div>
@@ -1670,26 +1670,34 @@ canvas.addEventListener('mouseleave',e=>{
   if(!_mouseCharging) charging=false;
 });
 
-// ---- Mouse wheel: yaw (desktop) ----
+// ---- Mouse wheel: 3-position yaw snap ----
 canvas.addEventListener('wheel',e=>{
   e.preventDefault();
   if(hitPopupPending||gameOver) return;
-  // scroll down = nearer (+yaw), scroll up = farther (-yaw)
-  const delta = e.deltaY > 0 ? 1 : -1;
-  yaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, yaw + delta * YAW_MAX/15));
-  updateHUD();
+  snapYaw(e.deltaY > 0 ? 1 : -1); // scroll down = right, up = left
 },{passive:false});
 
-// ---- A/D keys: yaw (desktop) ----
+// ---- A/D keys + scroll: 3-position yaw snap (-10°, 0°, +10°) ----
+const YAW_SNAP = [-(Math.PI/18), 0, (Math.PI/18)]; // -10°, 0°, +10°
+function snapYaw(dir){
+  // Find index of nearest current step
+  let best=1, bestD=Infinity;
+  YAW_SNAP.forEach((v,i)=>{ const d=Math.abs(v-yaw); if(d<bestD){bestD=d;best=i;} });
+  const ni=Math.max(0,Math.min(YAW_SNAP.length-1,best+dir));
+  yaw=YAW_SNAP[ni];
+  updateHUD(); sfxAngleTick();
+}
 document.addEventListener('keydown',e=>{
-  if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
-  const step = YAW_MAX / 15;
-  if(e.key==='a'||e.key==='A'){
-    yaw = Math.max(-YAW_MAX, yaw - step); updateHUD(); sfxAngleTick();
-  } else if(e.key==='d'||e.key==='D'){
-    yaw = Math.min( YAW_MAX, yaw + step); updateHUD(); sfxAngleTick();
-  }
+  if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
+  if(e.key==='a'||e.key==='A') snapYaw(-1);
+  else if(e.key==='d'||e.key==='D') snapYaw(1);
 });
+// ---- Double-click: reset yaw to centre ----
+canvas.addEventListener('dblclick',e=>{
+  e.preventDefault();
+  yaw=0; updateHUD(); sfxAngleTick();
+});
+
 // ---- TOUCH CONTROLS ----
 // Drag = adjust angle by relative vertical movement
 // Hold still 2s = start charging; release = fire
@@ -1699,10 +1707,19 @@ const TOUCH_ANGLE_SENS = 0.008; // radians per pixel of vertical drag (right hal
 const TOUCH_POWER_SENS = 0.004; // power change per pixel of horizontal drag (right half)
 // Left half of canvas: vertical drag = yaw
 
+let _lastTapTime=0;
 canvas.addEventListener('touchstart',e=>{
   e.preventDefault();
   if(hitPopupPending||gameOver) return;
   const t=e.touches[0];
+  // Double-tap: reset yaw to centre
+  const now=Date.now();
+  if(now-_lastTapTime<350&&e.touches.length===1){
+    yaw=0; updateHUD(); sfxAngleTick();
+    _lastTapTime=0;
+    return;
+  }
+  _lastTapTime=now;
   _touchLastY = t.clientY;
   _touchLastX = t.clientX;
   _touchStartY = t.clientY;
@@ -2738,6 +2755,7 @@ function updateProjectile(dt){
      psy >= waterSurfaceY && psy < waterSurfaceY + Math.abs(projectile.vy)*1.8 + 8){
     _projWasInWater = true;
     _projUnderwater = true;
+    _projWasAbove = false;  // prevent whistle retriggering underwater
     stopWhistle();
     // Spawn surface splash — check fish at entry point
     let hitAtSurface = false;
@@ -2811,6 +2829,7 @@ function updateProjectile(dt){
             });
           }
           // Destroy projectile after underwater explosion
+          stopWhistle();
           projectile=null;trail=[];
           checkRoundEnd();
           return;
@@ -2820,6 +2839,7 @@ function updateProjectile(dt){
 
     // Projectile sinks off bottom of lake
     if(psy > waterBottomY || psx<-30||psx>canvas.width+30){
+      stopWhistle();
       projectile=null;trail=[];
       checkRoundEnd();
       return;
@@ -3132,7 +3152,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v6.3
+     A321 前進楓之國  v6.4
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
