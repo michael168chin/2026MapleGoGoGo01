@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v6.5
+     版本：v6.6
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.5</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.6</div>
     </div>
   </div>
 </div>
@@ -1080,7 +1080,12 @@ function applySettings() {
   const fspd=document.getElementById('set-fish-spd');
   const fcnt=document.getElementById('set-fish-cnt');
   if(fspd) cfg.fishSpeed=Math.max(0,parseFloat(fspd.value)||0.6);
+  const prevCount = cfg.fishCount;
   if(fcnt) cfg.fishCount=parseInt(fcnt.value)||12;
+  // Add new fish if count was increased in settings (dead fish stay gone)
+  if(cfg.fishCount > prevCount){
+    for(let i=fish.length; i<cfg.fishCount; i++) fish.push(createFish());
+  }
   const fjmp=document.getElementById('set-fish-jump');
   if(fjmp) cfg.fishJumpSec=Math.max(5,parseInt(fjmp.value)||12);
   // Save sky font scale
@@ -1265,22 +1270,32 @@ function createFish(startRight){
     // 10~20 seconds at ~60fps = 600~1200 frames
     jumpTimer: Math.round((cfg.fishJumpSec||25)*60*(0.85+Math.random()*0.3)),
     stunTimer: 0,    // frames remaining for stun effect
+    deathTimer: 0,   // fade-out after stun (60=1s), -1=dead to remove
     flipped: false,  // belly-up when hit
   };
 }
 function updateFish(dt){
   const {riverL,riverR,waterTop,waterBot}=fishRiverBounds();
-  // Rebuild if count changed
-  while(fish.length < (cfg.fishCount||8)) fish.push(createFish());
+  // Only trim excess; do NOT auto-replenish dead fish
   while(fish.length > (cfg.fishCount||8)) fish.pop();
   // Global jump cooldown countdown
   if(_fishGlobalJumpCooldown > 0) _fishGlobalJumpCooldown--;
 
   fish.forEach((f,fi)=>{
     f.tailPhase+=dt*4; // slower tail animation
+
+    // Stun timer: counts down while fish is belly-up
     if(f.stunTimer > 0){
       f.stunTimer--;
-      if(f.stunTimer===0) f.flipped=false; // recover from flip
+      if(f.stunTimer===0){
+        f.deathTimer = 60; // stun ends → start 1-second fade-out
+        // fish stays flipped (dead) during fade
+      }
+    }
+    // Death fade timer: fish fades out then gets marked for removal
+    if(f.deathTimer > 0){
+      f.deathTimer--;
+      if(f.deathTimer === 0) f.deathTimer = -1; // mark for removal
     }
     if(f.jumping){
       f.jumpVy+=16*dt; // gravity
@@ -1321,15 +1336,22 @@ function updateFish(dt){
     }
   });
 }
+  // Remove fish marked dead (deathTimer=-1); not replenished
+  fish = fish.filter(f => f.deathTimer !== -1);
+
 function drawFish(){
   fish.forEach(f=>{
     const fx= f.jumping ? f.x+f.jumpX : f.x;
     const fy= f.jumping ? f.y+f.jumpY : f.y;
     ctx.save();
     ctx.translate(fx,fy);
-    // Stun flash effect
+    // Stun flash during stun; fade out during deathTimer
     if(f.stunTimer > 0){
       ctx.globalAlpha = 0.3 + 0.7*(f.stunTimer % 8 < 4 ? 1 : 0);
+    } else if(f.deathTimer > 0){
+      ctx.globalAlpha = f.deathTimer / 60; // fade from 1.0 → 0
+    } else if(f.deathTimer === -1){
+      ctx.restore(); return; // already marked dead, skip
     }
     if(f.jumping){
       // Fish head points up when jumping: rotate based on velocity
@@ -3144,7 +3166,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v6.5
+     A321 前進楓之國  v6.6
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
