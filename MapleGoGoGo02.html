@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v6.4
+     版本：v6.5
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.4</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.5</div>
     </div>
   </div>
 </div>
@@ -608,8 +608,9 @@ const cfg = {
   fishSpeed: 0.4,
   fishCount: 8,
   fishJumpSec: 25,
-  fishEffect: true,   // B23: show fish explosion effect
-  hideAimLine: false, // B24: hide aim line
+  skyFontScale: 1.3,  // font scale multiplier (1.0 = base ~15pt at 900px)
+  fishEffect: true,   // show fish explosion effect
+  hideAimLine: false, // hide aim line
 };
 
 // ===================== GOOGLE SHEETS =====================
@@ -640,7 +641,7 @@ async function gsWriteParams(vals){
   }catch(e){ console.warn('寫入遊戲參數失敗:',e); }
 }
 
-// Apply 23 values (C2:C24) from sheet to cfg + reload gear UI if open
+// Apply 24 values (C2:C25) from sheet to cfg + reload gear UI if open
 function applyParamsFromSheet(v){
   if(!v || v.length < 22) return;
   if(v[0]!==null&&v[0]!=='') cfg.title = String(v[0]);
@@ -651,17 +652,20 @@ function applyParamsFromSheet(v){
   if(v[5]!==null&&v[5]!=='') cfg.fishCount   = parseInt(v[5])   || 8;
   if(v[6]!==null&&v[6]!=='') cfg.fishJumpSec = parseInt(v[6])   || 25;
   for(let i=0;i<6;i++) cfg.skyTexts[i] = (v[7+i]!==null&&v[7+i]!==undefined)?String(v[7+i]):'';
-  if(v[13]!==null&&v[13]!=='') TARGET_SPECS[0].pts   = parseInt(v[13])||800;
-  if(v[14]!==null&&v[14]!=='') TARGET_SPECS[0].count = parseInt(v[14])||3;
-  if(v[15]!==null&&v[15]!=='') TARGET_SPECS[1].pts   = parseInt(v[15])||500;
-  if(v[16]!==null&&v[16]!=='') TARGET_SPECS[1].count = parseInt(v[16])||6;
-  if(v[17]!==null&&v[17]!=='') TARGET_SPECS[2].pts   = parseInt(v[17])||300;
-  if(v[18]!==null&&v[18]!=='') TARGET_SPECS[2].count = parseInt(v[18])||12;
-  if(v[19]!==null&&v[19]!=='') TARGET_SPECS[3].pts   = parseInt(v[19])||200;
-  if(v[20]!==null&&v[20]!=='') TARGET_SPECS[3].count = parseInt(v[20])||24;
-  // B23 fish effect, B24 hide aim line
-  if(v.length>21){ const f=String(v[21]).toUpperCase(); cfg.fishEffect  = (f===''||f==='TRUE'||f==='1'); }
-  if(v.length>22){ const h=String(v[22]).toUpperCase(); cfg.hideAimLine = (h==='TRUE'||h==='1'); }
+  // B15 (index 13) = skyFontScale (NEW - inserted between sky texts and prizes)
+  if(v[13]!==null&&v[13]!=='') cfg.skyFontScale = parseFloat(v[13])||1.3;
+  // B16-B23 (index 14-21) = prize tiers (shifted by 1)
+  if(v[14]!==null&&v[14]!=='') TARGET_SPECS[0].pts   = parseInt(v[14])||800;
+  if(v[15]!==null&&v[15]!=='') TARGET_SPECS[0].count = parseInt(v[15])||3;
+  if(v[16]!==null&&v[16]!=='') TARGET_SPECS[1].pts   = parseInt(v[16])||500;
+  if(v[17]!==null&&v[17]!=='') TARGET_SPECS[1].count = parseInt(v[17])||6;
+  if(v[18]!==null&&v[18]!=='') TARGET_SPECS[2].pts   = parseInt(v[18])||300;
+  if(v[19]!==null&&v[19]!=='') TARGET_SPECS[2].count = parseInt(v[19])||12;
+  if(v[20]!==null&&v[20]!=='') TARGET_SPECS[3].pts   = parseInt(v[20])||200;
+  if(v[21]!==null&&v[21]!=='') TARGET_SPECS[3].count = parseInt(v[21])||24;
+  // B24 (index 22) = fishEffect, B25 (index 23) = hideAimLine
+  if(v.length>22){ const f=String(v[22]).toUpperCase(); cfg.fishEffect  = (f===''||f==='TRUE'||f==='1'); }
+  if(v.length>23){ const h=String(v[23]).toUpperCase(); cfg.hideAimLine = (h==='TRUE'||h==='1'); }
   // Update title on screen
   const titleEl=document.getElementById('title-text');
   if(titleEl) titleEl.textContent=cfg.title;
@@ -933,6 +937,8 @@ function openSettings() {
     if(fcnt){fcnt.value=cfg.fishCount;document.getElementById('set-fish-cnt-val').textContent=cfg.fishCount;}
     const fjmp=document.getElementById('set-fish-jump');
     if(fjmp){fjmp.value=cfg.fishJumpSec;document.getElementById('set-fish-jump-val').textContent=cfg.fishJumpSec;}
+    const sfont=document.getElementById('set-sky-font');
+    if(sfont){sfont.value=cfg.skyFontScale||1.3;document.getElementById('set-sky-font-val').textContent=Math.round(15*(cfg.skyFontScale||1.3))+'pt';}
     const feff=document.getElementById('set-fish-effect');
     if(feff) feff.checked=cfg.fishEffect;
     const hail=document.getElementById('set-hide-aimline');
@@ -983,6 +989,7 @@ function applyDefaultParams(){
   const fp=document.getElementById('set-fish-spd');    if(fp){fp.value=DEF.fishSpeed;document.getElementById('set-fish-spd-val').textContent=DEF.fishSpeed.toFixed(2);}
   const fc=document.getElementById('set-fish-cnt');    if(fc){fc.value=DEF.fishCount;document.getElementById('set-fish-cnt-val').textContent=DEF.fishCount;}
   const fj=document.getElementById('set-fish-jump');   if(fj){fj.value=DEF.fishJumpSec;document.getElementById('set-fish-jump-val').textContent=DEF.fishJumpSec;}
+  const sf=document.getElementById('set-sky-font'); if(sf){sf.value=1.3;document.getElementById('set-sky-font-val').textContent='20pt';}
   const fe=document.getElementById('set-fish-effect'); if(fe) fe.checked=DEF.fishEffect;
   const ha=document.getElementById('set-hide-aimline');if(ha) ha.checked=DEF.hideAimLine;
   cfg.skyTexts=[...DEF.skyTexts]; loadSkyTextUI();
@@ -1008,6 +1015,7 @@ async function writeParamsToSheet(){
       parseInt(document.getElementById('set-fish-cnt')?.value)||cfg.fishCount,
       parseInt(document.getElementById('set-fish-jump')?.value)||cfg.fishJumpSec,
       ...skyVals,
+      parseFloat(document.getElementById('set-sky-font')?.value)||cfg.skyFontScale||1.3,  // skyFontScale at index 13
       parseInt(document.getElementById('prize-amt-0')?.value)||TARGET_SPECS[0].pts,
       parseInt(document.getElementById('prize-cnt-0')?.value)||TARGET_SPECS[0].count,
       parseInt(document.getElementById('prize-amt-1')?.value)||TARGET_SPECS[1].pts,
@@ -1075,6 +1083,9 @@ function applySettings() {
   if(fcnt) cfg.fishCount=parseInt(fcnt.value)||12;
   const fjmp=document.getElementById('set-fish-jump');
   if(fjmp) cfg.fishJumpSec=Math.max(5,parseInt(fjmp.value)||12);
+  // Save sky font scale
+  const sfont=document.getElementById('set-sky-font');
+  if(sfont) cfg.skyFontScale=parseFloat(sfont.value)||1.3;
   // Save fish effect and aim line toggle
   const feff=document.getElementById('set-fish-effect');
   if(feff) cfg.fishEffect=feff.checked;
@@ -1670,28 +1681,9 @@ canvas.addEventListener('mouseleave',e=>{
   if(!_mouseCharging) charging=false;
 });
 
-// ---- Mouse wheel: 3-position yaw snap ----
-canvas.addEventListener('wheel',e=>{
-  e.preventDefault();
-  if(hitPopupPending||gameOver) return;
-  snapYaw(e.deltaY > 0 ? 1 : -1); // scroll down = right, up = left
-},{passive:false});
+// (scroll wheel yaw removed)
 
-// ---- A/D keys + scroll: 3-position yaw snap (-10°, 0°, +10°) ----
-const YAW_SNAP = [-(Math.PI/18), 0, (Math.PI/18)]; // -10°, 0°, +10°
-function snapYaw(dir){
-  // Find index of nearest current step
-  let best=1, bestD=Infinity;
-  YAW_SNAP.forEach((v,i)=>{ const d=Math.abs(v-yaw); if(d<bestD){bestD=d;best=i;} });
-  const ni=Math.max(0,Math.min(YAW_SNAP.length-1,best+dir));
-  yaw=YAW_SNAP[ni];
-  updateHUD(); sfxAngleTick();
-}
-document.addEventListener('keydown',e=>{
-  if(e.target&&(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
-  if(e.key==='a'||e.key==='A') snapYaw(-1);
-  else if(e.key==='d'||e.key==='D') snapYaw(1);
-});
+// A/D keys and scroll wheel yaw removed (use iPad touch drag for yaw)
 // ---- Double-click: reset yaw to centre ----
 canvas.addEventListener('dblclick',e=>{
   e.preventDefault();
@@ -2160,7 +2152,7 @@ function drawBackground(){
     const tx=cw*(xPositions[i]||0.1+i*0.15) + Math.sin(now*0.18+phase)*cw*0.022;
     const ty=ch*(0.07+Math.sin(now*0.12+phase*0.7)*0.035) + (i%2)*ch*0.055;
     const alpha=0.45+Math.sin(now*0.4+phase)*0.08; // fixed alpha visible in both browsers
-    const fs=Math.round(cw*0.022);
+    const fs=Math.round(cw*0.022*(cfg.skyFontScale||1.3));
     ctx.save();
     ctx.globalAlpha=alpha;
     ctx.font=`900 ${fs}px Noto Sans TC, sans-serif`;
@@ -3152,7 +3144,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v6.4
+     A321 前進楓之國  v6.5
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
