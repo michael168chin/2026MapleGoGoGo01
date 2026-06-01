@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v5.9
+     版本：v6.0
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v5.9</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.0</div>
     </div>
   </div>
 </div>
@@ -417,15 +417,27 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
         oninput="document.getElementById('set-fish-jump-val').textContent=this.value">
       <span class="setting-val" id="set-fish-jump-val">25</span>
     </div>
+    <div class="setting-row">
+      <label>炸魚效果呈現</label>
+      <input type="checkbox" id="set-fish-effect" checked style="width:18px;height:18px;accent-color:#f1c40f;cursor:pointer;">
+    </div>
+    <div class="setting-row">
+      <label>隱藏瞄準線</label>
+      <input type="checkbox" id="set-hide-aimline" style="width:18px;height:18px;accent-color:#f1c40f;cursor:pointer;">
+    </div>
     <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">☁ 天空飄字（空白則不顯示）</div>
     <div id="sky-text-rows"></div>
     <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">🏆 獎項設定（金額 / 數量）</div>
     <div id="prize-settings-rows"></div>
-    <div style="display:flex;justify-content:center;gap:10px;margin-top:18px;flex-wrap:wrap;">
+    <div style="border-top:1px solid #444;margin:14px 0 10px;"></div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
       <button class="panel-btn" onclick="applySettings()">✔ 套用</button>
-      <button class="panel-btn secondary" onclick="resetSettingsToDefault()" style="background:linear-gradient(135deg,#1a4a1a,#2d7a2d);">↺ 還原預設</button>
+      <button class="panel-btn secondary" onclick="applyDefaultParams()" style="background:linear-gradient(135deg,#1a4a1a,#2d7a2d);">↺ 代入預設值</button>
+    </div>
+    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;">
+      <button class="panel-btn secondary" onclick="writeParamsToSheet()" style="background:linear-gradient(135deg,#1a3a6a,#2a5ab0);">☁ 寫入工作表</button>
       <button class="panel-btn secondary" onclick="closeSettings()">✕ 關閉</button>
     </div>
   </div>
@@ -593,14 +605,70 @@ const cfg = {
   ammoPerRound: 10,
   totalRounds: 3,
   skyTexts: ['實動抽', '達標抽', '報聘抽2次', '排名抽', '', ''],  // 6 groups
-  fishSpeed: 0.4,  // default speed (0-1, step 0.05)
+  fishSpeed: 0.4,
   fishCount: 8,
-  fishJumpSec: 25, // average seconds between jumps (slower default)
+  fishJumpSec: 25,
+  fishEffect: true,   // B23: show fish explosion effect
+  hideAimLine: false, // B24: hide aim line
 };
 
 // ===================== GOOGLE SHEETS =====================
 // 請將 Apps Script 部署後的 Web App 網址填入此處
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiy3PBuK_JOID8xagBQazSkmC0nOreQRxYzKVWRv6JjKxWVy0hbkF99gkzissIxB8J/exec';
+
+// ---- 遊戲參數 sheet (gid=1083492633) read/write ----
+async function gsReadParams(){
+  if(!APPS_SCRIPT_URL) return null;
+  try{
+    const res = await Promise.race([
+      fetch(APPS_SCRIPT_URL + '?type=params'),
+      new Promise((_,rej)=>setTimeout(()=>rej('timeout'),8000))
+    ]);
+    const data = await res.json();
+    return Array.isArray(data) ? data : null;
+  }catch(e){ console.warn('讀取遊戲參數失敗:',e); return null; }
+}
+
+async function gsWriteParams(vals){
+  if(!APPS_SCRIPT_URL) return;
+  try{
+    await fetch(APPS_SCRIPT_URL,{
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({type:'writeParams', values:vals})
+    });
+  }catch(e){ console.warn('寫入遊戲參數失敗:',e); }
+}
+
+// Apply 23 values (C2:C24) from sheet to cfg + reload gear UI if open
+function applyParamsFromSheet(v){
+  if(!v || v.length < 22) return;
+  if(v[0]!==null&&v[0]!=='') cfg.title = String(v[0]);
+  if(v[1]!==null&&v[1]!=='') cfg.speedMult   = parseFloat(v[1]) || 2.5;
+  if(v[2]!==null&&v[2]!=='') cfg.ammoPerRound= parseInt(v[2])   || 10;
+  if(v[3]!==null&&v[3]!=='') cfg.totalRounds = parseInt(v[3])   || 3;
+  if(v[4]!==null&&v[4]!=='') cfg.fishSpeed   = parseFloat(v[4]) || 0.4;
+  if(v[5]!==null&&v[5]!=='') cfg.fishCount   = parseInt(v[5])   || 8;
+  if(v[6]!==null&&v[6]!=='') cfg.fishJumpSec = parseInt(v[6])   || 25;
+  for(let i=0;i<6;i++) cfg.skyTexts[i] = (v[7+i]!==null&&v[7+i]!==undefined)?String(v[7+i]):'';
+  if(v[13]!==null&&v[13]!=='') TARGET_SPECS[0].pts   = parseInt(v[13])||800;
+  if(v[14]!==null&&v[14]!=='') TARGET_SPECS[0].count = parseInt(v[14])||3;
+  if(v[15]!==null&&v[15]!=='') TARGET_SPECS[1].pts   = parseInt(v[15])||500;
+  if(v[16]!==null&&v[16]!=='') TARGET_SPECS[1].count = parseInt(v[16])||6;
+  if(v[17]!==null&&v[17]!=='') TARGET_SPECS[2].pts   = parseInt(v[17])||300;
+  if(v[18]!==null&&v[18]!=='') TARGET_SPECS[2].count = parseInt(v[18])||12;
+  if(v[19]!==null&&v[19]!=='') TARGET_SPECS[3].pts   = parseInt(v[19])||200;
+  if(v[20]!==null&&v[20]!=='') TARGET_SPECS[3].count = parseInt(v[20])||24;
+  // B23 fish effect, B24 hide aim line
+  if(v.length>21){ const f=String(v[21]).toUpperCase(); cfg.fishEffect  = (f===''||f==='TRUE'||f==='1'); }
+  if(v.length>22){ const h=String(v[22]).toUpperCase(); cfg.hideAimLine = (h==='TRUE'||h==='1'); }
+  // Update title on screen
+  const titleEl=document.getElementById('title-text');
+  if(titleEl) titleEl.textContent=cfg.title;
+  document.title = cfg.title;
+  try{ initTargets(); }catch(e){}
+  updateHUD();
+}
 
 async function gsRegisterPlayer(name, character) {
   if (!APPS_SCRIPT_URL) return;
@@ -775,8 +843,9 @@ function selectChar(i){
   selectedChar=i;
 }
 function buildCharSelect() {
-  // Cards already in HTML — just load players from Sheets
   loadExistingPlayers().catch(()=>{});
+  // Load game params from sheet in background
+  gsReadParams().then(vals=>{ if(vals) applyParamsFromSheet(vals); }).catch(()=>{});
 }
 
 async function loadExistingPlayers() {
@@ -864,6 +933,10 @@ function openSettings() {
     if(fcnt){fcnt.value=cfg.fishCount;document.getElementById('set-fish-cnt-val').textContent=cfg.fishCount;}
     const fjmp=document.getElementById('set-fish-jump');
     if(fjmp){fjmp.value=cfg.fishJumpSec;document.getElementById('set-fish-jump-val').textContent=cfg.fishJumpSec;}
+    const feff=document.getElementById('set-fish-effect');
+    if(feff) feff.checked=cfg.fishEffect;
+    const hail=document.getElementById('set-hide-aimline');
+    if(hail) hail.checked=cfg.hideAimLine;
     document.getElementById('settings-overlay').classList.add('active');
   });
 }
@@ -894,34 +967,65 @@ function showPwdError(){
   setTimeout(()=>document.getElementById('pwd-input').focus(),100);
 }
 function closeSettings() { document.getElementById('settings-overlay').classList.remove('active'); }
-function resetSettingsToDefault(){
-  const DEF = {
+
+// Apply hardcoded defaults to gear UI fields (B23/B24 also reset)
+function applyDefaultParams(){
+  const DEF={
     title:'A321 前進楓之國', speedMult:2.5, ammoPerRound:10, totalRounds:3,
     fishSpeed:0.4, fishCount:8, fishJumpSec:25,
-    skyTexts:['實動抽','達標抽','報聘抽2次','排名抽','','']
+    skyTexts:['實動抽','達標抽','報聘抽2次','排名抽','',''],
+    fishEffect:true, hideAimLine:false
   };
-  // Restore cfg
-  cfg.title=DEF.title; cfg.speedMult=DEF.speedMult;
-  cfg.ammoPerRound=DEF.ammoPerRound; cfg.totalRounds=DEF.totalRounds;
-  cfg.fishSpeed=DEF.fishSpeed; cfg.fishCount=DEF.fishCount;
-  cfg.fishJumpSec=DEF.fishJumpSec;
-  cfg.skyTexts=[...DEF.skyTexts];
-  // Restore TARGET_SPECS
-  TARGET_SPECS[0].pts=800; TARGET_SPECS[0].count=3;
-  TARGET_SPECS[1].pts=500; TARGET_SPECS[1].count=6;
-  TARGET_SPECS[2].pts=300; TARGET_SPECS[2].count=12;
-  TARGET_SPECS[3].pts=200; TARGET_SPECS[3].count=24;
-  // Reload UI values
-  const st=document.getElementById('set-title'); if(st) st.value=DEF.title;
-  const ss=document.getElementById('set-speed'); if(ss){ss.value=DEF.speedMult;document.getElementById('set-speed-val').textContent=DEF.speedMult.toFixed(1);}
-  const sa=document.getElementById('set-ammo'); if(sa){sa.value=DEF.ammoPerRound;document.getElementById('set-ammo-val').textContent=DEF.ammoPerRound;}
-  const sr=document.getElementById('set-rounds'); if(sr){sr.value=DEF.totalRounds;document.getElementById('set-rounds-val').textContent=DEF.totalRounds;}
-  const fspd=document.getElementById('set-fish-spd'); if(fspd){fspd.value=DEF.fishSpeed;document.getElementById('set-fish-spd-val').textContent=DEF.fishSpeed.toFixed(2);}
-  const fcnt=document.getElementById('set-fish-cnt'); if(fcnt){fcnt.value=DEF.fishCount;document.getElementById('set-fish-cnt-val').textContent=DEF.fishCount;}
-  const fjmp=document.getElementById('set-fish-jump'); if(fjmp){fjmp.value=DEF.fishJumpSec;document.getElementById('set-fish-jump-val').textContent=DEF.fishJumpSec;}
-  loadSkyTextUI();
+  const st=document.getElementById('set-title');       if(st) st.value=DEF.title;
+  const ss=document.getElementById('set-speed');       if(ss){ss.value=DEF.speedMult;document.getElementById('set-speed-val').textContent=DEF.speedMult.toFixed(1);}
+  const sa=document.getElementById('set-ammo');        if(sa){sa.value=DEF.ammoPerRound;document.getElementById('set-ammo-val').textContent=DEF.ammoPerRound;}
+  const sr=document.getElementById('set-rounds');      if(sr){sr.value=DEF.totalRounds;document.getElementById('set-rounds-val').textContent=DEF.totalRounds;}
+  const fp=document.getElementById('set-fish-spd');    if(fp){fp.value=DEF.fishSpeed;document.getElementById('set-fish-spd-val').textContent=DEF.fishSpeed.toFixed(2);}
+  const fc=document.getElementById('set-fish-cnt');    if(fc){fc.value=DEF.fishCount;document.getElementById('set-fish-cnt-val').textContent=DEF.fishCount;}
+  const fj=document.getElementById('set-fish-jump');   if(fj){fj.value=DEF.fishJumpSec;document.getElementById('set-fish-jump-val').textContent=DEF.fishJumpSec;}
+  const fe=document.getElementById('set-fish-effect'); if(fe) fe.checked=DEF.fishEffect;
+  const ha=document.getElementById('set-hide-aimline');if(ha) ha.checked=DEF.hideAimLine;
+  cfg.skyTexts=[...DEF.skyTexts]; loadSkyTextUI();
+  TARGET_SPECS[0].pts=800;TARGET_SPECS[0].count=3;
+  TARGET_SPECS[1].pts=500;TARGET_SPECS[1].count=6;
+  TARGET_SPECS[2].pts=300;TARGET_SPECS[2].count=12;
+  TARGET_SPECS[3].pts=200;TARGET_SPECS[3].count=24;
   loadPrizeSettingsUI();
 }
+
+// Collect current gear values and write to 遊戲參數 sheet
+async function writeParamsToSheet(){
+  const btn=document.querySelector('[onclick="writeParamsToSheet()"]');
+  if(btn){ btn.textContent='寫入中…'; btn.disabled=true; }
+  try{
+    const skyVals = Array.from({length:6},(_,i)=>document.getElementById('sky-txt-'+i)?.value.trim()||'');
+    const vals=[
+      document.getElementById('set-title')?.value||cfg.title,
+      parseFloat(document.getElementById('set-speed')?.value)||cfg.speedMult,
+      parseInt(document.getElementById('set-ammo')?.value)||cfg.ammoPerRound,
+      parseInt(document.getElementById('set-rounds')?.value)||cfg.totalRounds,
+      parseFloat(document.getElementById('set-fish-spd')?.value)||cfg.fishSpeed,
+      parseInt(document.getElementById('set-fish-cnt')?.value)||cfg.fishCount,
+      parseInt(document.getElementById('set-fish-jump')?.value)||cfg.fishJumpSec,
+      ...skyVals,
+      parseInt(document.getElementById('prize-amt-0')?.value)||TARGET_SPECS[0].pts,
+      parseInt(document.getElementById('prize-cnt-0')?.value)||TARGET_SPECS[0].count,
+      parseInt(document.getElementById('prize-amt-1')?.value)||TARGET_SPECS[1].pts,
+      parseInt(document.getElementById('prize-cnt-1')?.value)||TARGET_SPECS[1].count,
+      parseInt(document.getElementById('prize-amt-2')?.value)||TARGET_SPECS[2].pts,
+      parseInt(document.getElementById('prize-cnt-2')?.value)||TARGET_SPECS[2].count,
+      parseInt(document.getElementById('prize-amt-3')?.value)||TARGET_SPECS[3].pts,
+      parseInt(document.getElementById('prize-cnt-3')?.value)||TARGET_SPECS[3].count,
+      document.getElementById('set-fish-effect')?.checked ? 'TRUE' : 'FALSE',
+      document.getElementById('set-hide-aimline')?.checked ? 'TRUE' : 'FALSE',
+    ];
+    await gsWriteParams(vals);
+    if(btn){ btn.textContent='✔ 寫入成功！'; setTimeout(()=>{ btn.textContent='☁ 寫入工作表'; btn.disabled=false; },2000); }
+  }catch(e){
+    if(btn){ btn.textContent='✗ 寫入失敗'; setTimeout(()=>{ btn.textContent='☁ 寫入工作表'; btn.disabled=false; },2000); }
+  }
+}
+function resetSettingsToDefault(){ applyDefaultParams(); }
 function loadSkyTextUI(){
   const cont=document.getElementById('sky-text-rows');
   if(!cont) return;
@@ -971,6 +1075,11 @@ function applySettings() {
   if(fcnt) cfg.fishCount=parseInt(fcnt.value)||12;
   const fjmp=document.getElementById('set-fish-jump');
   if(fjmp) cfg.fishJumpSec=Math.max(5,parseInt(fjmp.value)||12);
+  // Save fish effect and aim line toggle
+  const feff=document.getElementById('set-fish-effect');
+  if(feff) cfg.fishEffect=feff.checked;
+  const hail=document.getElementById('set-hide-aimline');
+  if(hail) cfg.hideAimLine=hail.checked;
   // Save sky texts
   cfg.skyTexts.forEach((_,i)=>{
     const el=document.getElementById('sky-txt-'+i);
@@ -1533,6 +1642,27 @@ canvas.addEventListener('mousedown',e=>{
 canvas.addEventListener('mouseup',e=>{
   if(e.button!==0||!charging||projectile||ammoLeft<=0||hitPopupPending)return;
   charging=false; fire();
+});
+
+// ---- Mouse wheel: yaw (desktop) ----
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  if(hitPopupPending||gameOver) return;
+  // scroll down = nearer (+yaw), scroll up = farther (-yaw)
+  const delta = e.deltaY > 0 ? 1 : -1;
+  yaw = Math.max(-YAW_MAX, Math.min(YAW_MAX, yaw + delta * YAW_MAX/15));
+  updateHUD();
+},{passive:false});
+
+// ---- A/D keys: yaw (desktop) ----
+document.addEventListener('keydown',e=>{
+  if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
+  const step = YAW_MAX / 15;
+  if(e.key==='a'||e.key==='A'){
+    yaw = Math.max(-YAW_MAX, yaw - step); updateHUD(); sfxAngleTick();
+  } else if(e.key==='d'||e.key==='D'){
+    yaw = Math.min( YAW_MAX, yaw + step); updateHUD(); sfxAngleTick();
+  }
 });
 // ---- TOUCH CONTROLS ----
 // Drag = adjust angle by relative vertical movement
@@ -2595,7 +2725,7 @@ function updateProjectile(dt){
         f.vx=(fdx/Math.max(1,Math.abs(fdx)))*2+(Math.random()-0.5);
         f.vy=-3.5-Math.random()*2;
         f.jumping=false;
-        spawnWaterFishHit(f.x, f.y, f.color, projectile.vy, projectile.vx);
+        if(cfg.fishEffect) spawnWaterFishHit(f.x, f.y, f.color, projectile.vy, projectile.vx);
         hitAFish=true;
       }
     }
@@ -2639,7 +2769,7 @@ function drawProjectile(){
 
 // ---- Aim line ----
 function drawAimLine(){
-  if(projectile||gameOver||ammoLeft<=0)return;
+  if(projectile||gameOver||ammoLeft<=0||cfg.hideAimLine)return;
   const minSpd=8, maxSpd=24;
   const spd=minSpd+power*(maxSpd-minSpd);
   const dt=1/60;
@@ -2903,7 +3033,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v5.9
+     A321 前進楓之國  v6.0
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
