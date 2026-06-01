@@ -389,19 +389,19 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div class="setting-row">
       <label>砲彈數量</label>
-      <input type="range" id="set-ammo" min="5" max="20" step="1" value="10" oninput="document.getElementById('set-ammo-val').textContent=this.value">
+      <input type="range" id="set-ammo" min="1" max="20" step="1" value="3" oninput="document.getElementById('set-ammo-val').textContent=this.value">
       <span class="setting-val" id="set-ammo-val">10</span>
     </div>
     <div class="setting-row">
       <label>總輪次</label>
-      <input type="range" id="set-rounds" min="1" max="5" step="1" value="3" oninput="document.getElementById('set-rounds-val').textContent=this.value">
+      <input type="range" id="set-rounds" min="1" max="5" step="1" value="1" oninput="document.getElementById('set-rounds-val').textContent=this.value">
       <span class="setting-val" id="set-rounds-val">3</span>
     </div>
     <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">🐟 魚群設定</div>
     <div class="setting-row">
       <label>魚群游速</label>
-      <input type="range" id="set-fish-spd" min="0.0" max="1.0" step="0.05" value="0.4"
+      <input type="range" id="set-fish-spd" min="0.0" max="2.0" step="0.05" value="0.4"
         oninput="document.getElementById('set-fish-spd-val').textContent=parseFloat(this.value).toFixed(1)">
       <span class="setting-val" id="set-fish-spd-val">0.40</span>
     </div>
