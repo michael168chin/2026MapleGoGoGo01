@@ -187,7 +187,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 
 <!-- Login Auth -->
 <div class="overlay active" id="login-auth-overlay">
-  <div class="panel" style="max-width:340px;text-align:center;">
+  <div class="panel" style="max-width:340px;text-align:center;position:relative;">
     <h2 id="login-title">⏳ 載入設定中...</h2>
     <div id="login-pwd-section" style="display:none;">
       <p style="margin-bottom:12px;color:#ccc;font-size:.9rem;">本體驗版需要專屬密碼才能遊玩</p>
@@ -208,6 +208,11 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
       <div id="login-pwd-error" style="display:none;color:#e74c3c;font-size:.85rem;margin-bottom:8px;">❌ 密碼錯誤，請重試</div>
       <button class="panel-btn" style="width:100%;margin-top:6px;" onclick="verifyLoginPassword()">確認進入</button>
     </div>
+    <div id="login-version" style="
+      position:absolute;right:10px;bottom:8px;
+      font-size:.62rem;color:rgba(255,255,255,0.25);
+      letter-spacing:.5px;pointer-events:none;
+    ">v6.7 trial</div>
   </div>
 </div>
 
@@ -708,7 +713,10 @@ async function initGameAuth() {
     networkFailed = true;
     requirePwd = true;
     sysCorrectPwd = 'A321A321';
-    console.warn('Apps Script 讀取失敗，啟用備用密碼保護。', e);
+    const errMsg = (e && e.message) ? e.message : String(e);
+    console.warn('Apps Script 讀取失敗，啟用備用密碼保護。錯誤:', errMsg);
+    // 把錯誤訊息存起來，顯示在圖示 tooltip
+    window._authErrMsg = errMsg;
   }
 
   if (requirePwd) {
@@ -719,7 +727,8 @@ async function initGameAuth() {
     if (icon) {
       if (networkFailed) {
         icon.textContent = '🔴';
-        icon.title = '網路連線失敗，使用備用密碼';
+        const errDetail = window._authErrMsg ? ('\n錯誤：' + window._authErrMsg) : '';
+        icon.title = '網路連線失敗，使用備用密碼' + errDetail;
         icon.style.borderColor = '#e74c3c';
       } else {
         icon.textContent = '🟢';
