@@ -191,9 +191,20 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     <h2 id="login-title">⏳ 載入設定中...</h2>
     <div id="login-pwd-section" style="display:none;">
       <p style="margin-bottom:12px;color:#ccc;font-size:.9rem;">本體驗版需要專屬密碼才能遊玩</p>
-      <input type="password" id="login-pwd-input" placeholder="請輸入密碼" maxlength="20"
-        style="width:100%;padding:10px 14px;background:rgba(255,255,255,0.08);border:2px solid #555;border-radius:8px;color:#fff;font-size:1.1rem;font-family:inherit;letter-spacing:4px;text-align:center;margin-bottom:8px;"
-        onkeydown="if(event.key==='Enter')verifyLoginPassword()">
+      <div style="position:relative;">
+        <!-- 連線狀態圖示：左上角 -->
+        <div id="net-status-icon" style="
+          position:absolute;left:0;top:50%;transform:translateY(-50%);
+          width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+          border-radius:50%;font-size:15px;
+          background:rgba(255,255,255,0.07);border:1.5px solid #555;
+          title='讀取中';" title="連線狀態">
+          ⏳
+        </div>
+        <input type="password" id="login-pwd-input" placeholder="請輸入密碼" maxlength="20"
+          style="width:100%;padding:10px 14px 10px 38px;background:rgba(255,255,255,0.08);border:2px solid #555;border-radius:8px;color:#fff;font-size:1.1rem;font-family:inherit;letter-spacing:4px;text-align:center;margin-bottom:8px;"
+          onkeydown="if(event.key==='Enter')verifyLoginPassword()">
+      </div>
       <div id="login-pwd-error" style="display:none;color:#e74c3c;font-size:.85rem;margin-bottom:8px;">❌ 密碼錯誤，請重試</div>
       <button class="panel-btn" style="width:100%;margin-top:6px;" onclick="verifyLoginPassword()">確認進入</button>
     </div>
@@ -666,6 +677,7 @@ async function initGameAuth() {
 
   // 預設：網路失敗時強制要密碼，備用密碼 A321A321
   let requirePwd = true;
+  let networkFailed = false;
   sysCorrectPwd = 'A321A321';
 
   try {
@@ -698,6 +710,7 @@ async function initGameAuth() {
 
   } catch (e) {
     // 網路失敗 → 強制要密碼，使用備用密碼 A321A321
+    networkFailed = true;
     requirePwd = true;
     sysCorrectPwd = 'A321A321';
     console.warn('Google Sheets 讀取失敗，啟用備用密碼保護。', e);
@@ -706,9 +719,22 @@ async function initGameAuth() {
   if (requirePwd) {
     title.textContent = '🔐 遊戲登入';
     pwdSec.style.display = 'block';
+    // 更新連線狀態圖示
+    const icon = document.getElementById('net-status-icon');
+    if (icon) {
+      if (networkFailed) {
+        icon.textContent = '🔴';
+        icon.title = '網路連線失敗，使用備用密碼';
+        icon.style.borderColor = '#e74c3c';
+      } else {
+        icon.textContent = '🟢';
+        icon.title = '網路連線正常';
+        icon.style.borderColor = '#27ae60';
+      }
+    }
     setTimeout(() => document.getElementById('login-pwd-input').focus(), 100);
   } else {
-    // C2 = TRUE → 直接進入，不需輸入密碼
+    // C2 非 TRUE → 直接進入，不需輸入密碼
     startGameDirectly();
   }
 }
