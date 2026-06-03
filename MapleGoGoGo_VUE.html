@@ -671,9 +671,8 @@ async function initGameAuth() {
   const title = document.getElementById('login-title');
   const pwdSec = document.getElementById('login-pwd-section');
 
-  const sheetId = '1ExWiEvdh9VcDKkEtKypdguxSh5Y4ON-C1WEDKrcxDmk';
-  const gid = '780867095';
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}&range=C2:C3`;
+  // 透過 Apps Script 讀取 C2（是否需密碼）與 C3（密碼），避免 CORS 問題
+  const url = APPS_SCRIPT_URL + '?type=auth';
 
   // 預設：網路失敗時強制要密碼，備用密碼 A321A321
   let requirePwd = true;
@@ -690,19 +689,15 @@ async function initGameAuth() {
 
     if (!res.ok) throw new Error('HTTP ' + res.status);
 
-    const text = await res.text();
-    // CSV 可能每行帶雙引號，去除雙引號與 \r 後 trim
-    const rows = text.split('\n').map(r => r.replace(/["\r]/g, '').trim());
+    const data = await res.json();
+    // data = { requirePwd: true/false, pwd: '...' }
 
-    const c2 = (rows[0] || '').toUpperCase();  // C2：是否需要密碼
-    const c3 = (rows[1] || '').trim();          // C3：密碼（正常情況唯一有效密碼）
-
-    if (c2 === 'TRUE') {
+    if (data.requirePwd === true) {
       // 需要密碼，密碼完全由 C3 提供，不使用備用密碼
       requirePwd = true;
-      sysCorrectPwd = c3;
+      sysCorrectPwd = data.pwd || 'A321A321';
     } else {
-      // C2 為 FALSE / 空白 / 其他 → 直接進入，不需密碼
+      // C2 為 FALSE / 空白 → 直接進入，不需密碼
       requirePwd = false;
     }
 
@@ -713,7 +708,7 @@ async function initGameAuth() {
     networkFailed = true;
     requirePwd = true;
     sysCorrectPwd = 'A321A321';
-    console.warn('Google Sheets 讀取失敗，啟用備用密碼保護。', e);
+    console.warn('Apps Script 讀取失敗，啟用備用密碼保護。', e);
   }
 
   if (requirePwd) {
