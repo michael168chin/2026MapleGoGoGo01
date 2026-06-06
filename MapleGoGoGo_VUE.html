@@ -13,7 +13,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <style>:root{--sat:env(safe-area-inset-top,0px);}</style>
-<title>A321 前進楓之國(體驗版)</title>
+<title>A321 前進楓之國</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
@@ -151,7 +151,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
 <body>
 
 <div id="game-title">
-  <span id="title-text">A321 前進楓之國《體驗版》</span>
+  <span id="title-text">A321 前進楓之國</span>
 </div>
 
 <div id="game-wrap">
@@ -249,7 +249,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     <h2>⚙ 遊戲設定</h2>
     <div class="setting-row">
       <label>遊戲標題</label>
-      <input type="text" id="set-title" value="A321 前進楓之國『【體驗版】』">
+      <input type="text" id="set-title" value="A321 前進楓之國">
     </div>
     <div class="setting-row">
       <label>目標移動速度</label>
@@ -462,7 +462,7 @@ function sfxAngleTick(){
 
 // ===================== CONFIG =====================
 const cfg = {
-  title: 'A321 前進楓之國【體驗版】',
+  title: 'A321 前進楓之國',
   speedMult: 2.5,
   ammoPerRound: 3,
   totalRounds: 3,
@@ -819,7 +819,7 @@ function closeSettings() { document.getElementById('settings-overlay').classList
 
 function applyDefaultParams(){
   const DEF={
-    title:'A321 前進楓之國[體驗版]', speedMult:2.5, ammoPerRound:3, totalRounds:3,
+    title:'A321 前進楓之國', speedMult:2.5, ammoPerRound:3, totalRounds:3,
     fishSpeed:1.2, fishCount:20, fishJumpSec:25,
     skyTexts:['實動抽','達標抽','報聘抽2次','排名抽','',''],
     fishEffect:true, hideAimLine:false
@@ -2482,20 +2482,24 @@ function endGame(){
   document.getElementById('end-overlay').classList.add('active');
 }
 function restartGame(){
+  // 重新檢查 C2，讓管理員可隨時從工作表關閉遊戲
+  document.getElementById('end-overlay').classList.remove('active');
   score=0;round=1;ammoLeft=cfg.ammoPerRound;
   gameOver=false;projectile=null;trail=[];particles=[];power=0.5;
   initTargets();updateHUD();
-  document.getElementById('end-overlay').classList.remove('active');
+  initGameAuth();
 }
 function openResetConfirm(){
   document.getElementById('reset-overlay').classList.add('active');
 }
 function doReset(){
+  // 重新檢查 C2，讓管理員可隨時從工作表關閉遊戲
   document.getElementById('reset-overlay').classList.remove('active');
+  document.getElementById('end-overlay').classList.remove('active');
   score=0;round=1;ammoLeft=cfg.ammoPerRound;
   gameOver=false;projectile=null;trail=[];particles=[];power=0.5;
-  document.getElementById('end-overlay').classList.remove('active');
   initTargets();updateHUD();
+  initGameAuth();
 }
 
 function addScorePopup(x,y,pts,color){
