@@ -1,6 +1,6 @@
 <!-- ============================================================
      A321 前進楓之國
-     版本：v6.7
+     版本：v6.8
      日期：2026-05-28
      說明：楓之谷風格砲擊遊戲，加拿大風景背景
            含角色選擇、齒輪設定、重置按鈕、擊中彈窗
@@ -342,7 +342,7 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div style="position:relative;text-align:center;margin-top:8px;">
       <button class="panel-btn" id="enter-btn">⚔ 進入戰場！</button>
-      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.7</div>
+      <div style="position:absolute;right:0;bottom:-2px;font-size:.6rem;color:#888;letter-spacing:.5px;">v6.8</div>
     </div>
   </div>
 </div>
@@ -396,6 +396,12 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
       <label>總輪次</label>
       <input type="range" id="set-rounds" min="1" max="5" step="1" value="3" oninput="document.getElementById('set-rounds-val').textContent=this.value">
       <span class="setting-val" id="set-rounds-val">3</span>
+    </div>
+    <div class="setting-row">
+      <label>自動發射(秒)</label>
+      <input type="range" id="set-autofire" min="10" max="30" step="1" value="15"
+        oninput="document.getElementById('set-autofire-val').textContent=this.value">
+      <span class="setting-val" id="set-autofire-val">15</span>
     </div>
     <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">🐟 魚群設定</div>
@@ -609,6 +615,7 @@ const cfg = {
   fishCount: 20,
   fishJumpSec: 25,
   skyFontScale: 1.3,  // font scale multiplier (1.0 = base ~15pt at 900px)
+  autoFireSec: 15,    // B26: auto-fire after N seconds of charging
   fishEffect: true,   // show fish explosion effect
   hideAimLine: false, // hide aim line
 };
@@ -641,7 +648,7 @@ async function gsWriteParams(vals){
   }catch(e){ console.warn('寫入遊戲參數失敗:',e); }
 }
 
-// Apply 24 values (C2:C25) from sheet to cfg + reload gear UI if open
+// Apply 24 values (C2:C26) from sheet to cfg + reload gear UI if open
 function applyParamsFromSheet(v){
   if(!v || v.length < 22) return;
   if(v[0]!==null&&v[0]!=='') cfg.title = String(v[0]);
@@ -663,9 +670,10 @@ function applyParamsFromSheet(v){
   if(v[19]!==null&&v[19]!=='') TARGET_SPECS[2].count = parseInt(v[19])||12;
   if(v[20]!==null&&v[20]!=='') TARGET_SPECS[3].pts   = parseInt(v[20])||200;
   if(v[21]!==null&&v[21]!=='') TARGET_SPECS[3].count = parseInt(v[21])||24;
-  // B24 (index 22) = fishEffect, B25 (index 23) = hideAimLine
+  // B24 (index 22) = fishEffect, B25 (index 23) = hideAimLine, B26 (index 24) = autoFireSec
   if(v.length>22){ const f=String(v[22]).toUpperCase(); cfg.fishEffect  = (f===''||f==='TRUE'||f==='1'); }
   if(v.length>23){ const h=String(v[23]).toUpperCase(); cfg.hideAimLine = (h==='TRUE'||h==='1'); }
+  if(v.length>24 && v[24]!==null&&v[24]!=='') cfg.autoFireSec = Math.max(10,Math.min(30,parseInt(v[24])||15));
   // Update title on screen
   const titleEl=document.getElementById('title-text');
   if(titleEl) titleEl.textContent=cfg.title;
@@ -929,6 +937,8 @@ function openSettings() {
     document.getElementById('set-ammo-val').textContent = cfg.ammoPerRound;
     document.getElementById('set-rounds').value = cfg.totalRounds;
     document.getElementById('set-rounds-val').textContent = cfg.totalRounds;
+    const safc=document.getElementById('set-autofire');
+    if(safc){safc.value=cfg.autoFireSec||15;document.getElementById('set-autofire-val').textContent=cfg.autoFireSec||15;}
     loadPrizeSettingsUI();
     loadSkyTextUI();
     const fspd=document.getElementById('set-fish-spd');
@@ -977,7 +987,7 @@ function closeSettings() { document.getElementById('settings-overlay').classList
 // Apply hardcoded defaults to gear UI fields (B23/B24 also reset)
 function applyDefaultParams(){
   const DEF={
-    title:'A321 前進楓之國', speedMult:2.5, ammoPerRound:3, totalRounds:3,
+    title:'A321 前進楓之國', speedMult:2.5, ammoPerRound:3, totalRounds:3, autoFireSec:15,
     fishSpeed:1.2, fishCount:20, fishJumpSec:25,
     skyTexts:['實動抽','達標抽','報聘抽2次','排名抽','',''],
     fishEffect:true, hideAimLine:false
@@ -986,6 +996,7 @@ function applyDefaultParams(){
   const ss=document.getElementById('set-speed');       if(ss){ss.value=DEF.speedMult;document.getElementById('set-speed-val').textContent=DEF.speedMult.toFixed(1);}
   const sa=document.getElementById('set-ammo');        if(sa){sa.value=DEF.ammoPerRound;document.getElementById('set-ammo-val').textContent=DEF.ammoPerRound;}
   const sr=document.getElementById('set-rounds');      if(sr){sr.value=DEF.totalRounds;document.getElementById('set-rounds-val').textContent=DEF.totalRounds;}
+  const safd=document.getElementById('set-autofire');   if(safd){safd.value=15;document.getElementById('set-autofire-val').textContent=15;}
   const fp=document.getElementById('set-fish-spd');    if(fp){fp.value=DEF.fishSpeed;document.getElementById('set-fish-spd-val').textContent=DEF.fishSpeed.toFixed(2);}
   const fc=document.getElementById('set-fish-cnt');    if(fc){fc.value=DEF.fishCount;document.getElementById('set-fish-cnt-val').textContent=DEF.fishCount;}
   const fj=document.getElementById('set-fish-jump');   if(fj){fj.value=DEF.fishJumpSec;document.getElementById('set-fish-jump-val').textContent=DEF.fishJumpSec;}
@@ -1026,6 +1037,7 @@ async function writeParamsToSheet(){
       parseInt(document.getElementById('prize-cnt-3')?.value)||TARGET_SPECS[3].count,
       document.getElementById('set-fish-effect')?.checked ? 'TRUE' : 'FALSE',
       document.getElementById('set-hide-aimline')?.checked ? 'TRUE' : 'FALSE',
+      parseInt(document.getElementById('set-autofire')?.value)||cfg.autoFireSec||15,
     ];
     await gsWriteParams(vals);
     if(btn){ btn.textContent='✔ 寫入成功！'; setTimeout(()=>{ btn.textContent='☁ 寫入工作表'; btn.disabled=false; },2000); }
@@ -1077,6 +1089,8 @@ function applySettings() {
     const cnt=parseInt(document.getElementById('prize-cnt-'+i)?.value)||spec.count;
     spec.pts=amt; spec.count=cnt;
   });
+  const safc2=document.getElementById('set-autofire');
+  if(safc2) cfg.autoFireSec=Math.max(10,Math.min(30,parseInt(safc2.value)||15));
   const fspd=document.getElementById('set-fish-spd');
   const fcnt=document.getElementById('set-fish-cnt');
   if(fspd) cfg.fishSpeed=Math.max(0,parseFloat(fspd.value)||0.6);
@@ -3118,6 +3132,11 @@ function gameLoop(ts){
     const el=(performance.now()-chargeStart)/1000;
     power=Math.min(el/4.0,1.0);updateHUD();
     sfxCharge(power);
+    // Auto-fire if charging time exceeds cfg.autoFireSec
+    if(el >= (cfg.autoFireSec||15) && !projectile && ammoLeft>0 && !hitPopupPending){
+      charging=false;
+      fire(); // auto-fire!
+    }
   }
   requestAnimationFrame(gameLoop);
   } catch(e) {
@@ -3166,7 +3185,7 @@ if(document.readyState==='loading'){
 
 <!-- ============================================================
      程式結束 / END OF PROGRAM
-     A321 前進楓之國  v6.7
+     A321 前進楓之國  v6.8
      更新：2026-05-28
      © 2026  All rights reserved.
 ============================================================ -->
