@@ -258,13 +258,13 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div class="setting-row">
       <label>砲彈數量</label>
-      <input type="range" id="set-ammo" min="1" max="20" step="1" value="3" oninput="document.getElementById('set-ammo-val').textContent=this.value">
-      <span class="setting-val" id="set-ammo-val">3</span>
+      <input type="range" id="set-ammo" min="1" max="20" step="1" value="4" oninput="document.getElementById('set-ammo-val').textContent=this.value">
+      <span class="setting-val" id="set-ammo-val">4</span>
     </div>
     <div class="setting-row">
       <label>總輪次</label>
-      <input type="range" id="set-rounds" min="1" max="5" step="1" value="3" oninput="document.getElementById('set-rounds-val').textContent=this.value">
-      <span class="setting-val" id="set-rounds-val">3</span>
+      <input type="range" id="set-rounds" min="1" max="5" step="1" value="1" oninput="document.getElementById('set-rounds-val').textContent=this.value">
+      <span class="setting-val" id="set-rounds-val">1</span>
     </div>
     <div style="border-top:1px solid #444;margin:12px 0 8px;"></div>
     <div style="color:var(--maple-yellow);font-weight:700;font-size:.82rem;margin-bottom:8px;">🐟 魚群設定</div>
@@ -464,8 +464,8 @@ function sfxAngleTick(){
 const cfg = {
   title: 'A321 前進楓之國（體驗版）',
   speedMult: 2.5,
-  ammoPerRound: 3,
-  totalRounds: 3,
+  ammoPerRound: 4,
+  totalRounds: 1,
   skyTexts: ['實動抽', '達標抽', '報聘抽2次', '排名抽', '', ''],
   fishSpeed: 1.2,
   fishCount: 20,
@@ -817,9 +817,17 @@ function showPwdError(){
 }
 function closeSettings() { document.getElementById('settings-overlay').classList.remove('active'); }
 
+// ESC 鍵關閉設定視窗
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    const settingsOpen = document.getElementById('settings-overlay').classList.contains('active');
+    if (settingsOpen) closeSettings();
+  }
+});
+
 function applyDefaultParams(){
   const DEF={
-    title:'A321 前進楓之國（體驗版）', speedMult:2.5, ammoPerRound:3, totalRounds:3,
+    title:'A321 前進楓之國（體驗版）', speedMult:2.5, ammoPerRound:4, totalRounds:1,
     fishSpeed:1.2, fishCount:20, fishJumpSec:25,
     skyTexts:['實動抽','達標抽','報聘抽2次','排名抽','',''],
     fishEffect:true, hideAimLine:false
