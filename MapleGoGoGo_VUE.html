@@ -276,9 +276,9 @@ canvas{display:block;border:3px solid var(--maple-yellow);border-radius:8px;
     </div>
     <div class="setting-row">
       <label>魚群數量</label>
-      <input type="range" id="set-fish-cnt" min="0" max="100" step="1" value="20"
+      <input type="range" id="set-fish-cnt" min="0" max="100" step="1" value="7"
         oninput="document.getElementById('set-fish-cnt-val').textContent=this.value">
-      <span class="setting-val" id="set-fish-cnt-val">20</span>
+      <span class="setting-val" id="set-fish-cnt-val">7</span>
     </div>
     <div class="setting-row">
       <label>魚跳間隔(秒)</label>
@@ -468,7 +468,7 @@ const cfg = {
   totalRounds: 1,
   skyTexts: ['實動抽', '達標抽', '報聘抽2次', '排名抽', '', ''],
   fishSpeed: 1.2,
-  fishCount: 20,
+  fishCount: 7,
   fishJumpSec: 25,
   skyFontScale: 1.3,
   fishEffect: true,
@@ -828,7 +828,7 @@ document.addEventListener('keydown', function(e) {
 function applyDefaultParams(){
   const DEF={
     title:'A321 前進楓之國（體驗版）', speedMult:2.5, ammoPerRound:4, totalRounds:1,
-    fishSpeed:1.2, fishCount:20, fishJumpSec:25,
+    fishSpeed:1.2, fishCount:7, fishJumpSec:25,
     skyTexts:['實動抽','達標抽','報聘抽2次','排名抽','',''],
     fishEffect:true, hideAimLine:false
   };
